@@ -64,7 +64,7 @@ class MocaFileError(Exception):
 # -- Variables --------------------------------------------------------------------------
 
 
-VERSION = '1.0.1'
+VERSION = '1.0.7'
 
 __USAGE = """
     Usage:

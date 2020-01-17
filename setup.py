@@ -9,7 +9,11 @@ root_dir = path.abspath(path.dirname(__file__))
 
 
 def __requirements():
-    return [name.rstrip() for name in open(path.join(root_dir, 'requirement.txt')).readlines()]
+    require_list = [name.rstrip() for name in open(path.join(root_dir, 'requirements.txt')).readlines()]
+    print('----------------------------------------------------------------------------')
+    print('Requirements List: ' + ','.join(require_list))
+    print('----------------------------------------------------------------------------')
+    return require_list
 
 
 with open('README.md', mode='r', encoding='utf-8') as f:
