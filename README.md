@@ -4,6 +4,11 @@
 - sanic_openapi
 - docopt
 
+# Installation
+```
+pip install moca_config==1.0.7
+```
+
 # Overview
 ##### English
 This is the config module developed by el.ideal-ideas for Moca System.
