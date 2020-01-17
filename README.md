@@ -7,6 +7,8 @@
 # Installation
 ```
 pip install moca_config==1.0.7
+or
+pip install moca_config
 ```
 
 # Overview
@@ -32,6 +34,7 @@ MocaConfig类会每5（初期值）秒重新读取一次JSON文件。
 如果JSON文件被改写，内存内的设定信息也会和JSON文件同步。
 
 # Usage Example
+###### Use in your application
 ```python
 # Create a instance.
 # インスタンス化。
@@ -51,6 +54,19 @@ moca_config.get('lang', str, default='english')
 # 設定情報を追加してJSONファイルを更新します。
 # 添加设定信息并且更新JSON文件
 moca_config.set('lang', 'english')
+```
+###### Use in terminal
+MocaConfig can run as a standalone api(set or get config and so on) server.
+For more details, please read api documentation(swagger).
+
+MocaConfigは独立動作する設定に関する機能と提供APIサーバーとしても使用可能。
+詳細に関してはswaggerによって作られたAPIドキュメントをご覧ください。
+
+MocaConfig也可以作为一个独立运行的提供关于设定的API服务器。
+详细信息请看用swagger生成的API文档。
+
+```bash
+moca_config ./config/config.json -p 5901 
 ```
 
 # MocaConfig Class
