@@ -64,7 +64,7 @@ class MocaFileError(Exception):
 # -- Variables --------------------------------------------------------------------------
 
 
-VERSION = '1.0.0'
+VERSION = '1.0.1'
 
 __USAGE = """
     Usage:
@@ -864,9 +864,8 @@ def run_server(config_name: str = '',
 
 # -- Run As Main --------------------------------------------------------------------------
 
-if __name__ == '__main__':
+def main():
     args = docopt(__USAGE)
-    print(args)
     if args.get('help'):
         print(__HELP)
     elif args.get('PATH') is not None:
@@ -963,5 +962,9 @@ if __name__ == '__main__':
         """)
         sleep(1)
         print(__USAGE)
+
+
+if __name__ == '__main__':
+    main()
 
 # -------------------------------------------------------------------------- Run As Main --

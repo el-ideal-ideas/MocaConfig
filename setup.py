@@ -1,7 +1,7 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 from codecs import open
 from os import path
-from re import search
+from moca_config import VERSION
 
 package_name = "moca_config"
 
@@ -17,15 +17,21 @@ with open('README.md', mode='r', encoding='utf-8') as f:
 
 setup(
     name=package_name,
-    packages=['./src/MocaConfig.py'],
-    version='1.0.0',
+    packages=find_packages(),
+    version=VERSION,
     license=license,
     install_requires=__requirements(),
     author='el.ideal.ideas',
     author_email='el.idealideas@gmail.com',
-    url='https://www.el-ideal-ideas.com',
+    url='https://github.com/el-ideal-ideas/MocaConfig',
     description='An JSON based config manager.',
     long_description=long_description,
+    long_description_content_type='text/markdown',
+    entry_points={
+        'console_scripts': [
+            'moca_config=moca_config.MocaConfig:main'
+        ]
+    },
     keywords='Moca, MocaConfig, config, json, JSON',
     classifiers=[
         'Development Status :: 5 - Production/Stable',
