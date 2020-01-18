@@ -1,5 +1,5 @@
 # System Requirements
-- Python >= 3.7
+- Python >= 3.6
 - sanic
 - sanic_openapi
 - docopt

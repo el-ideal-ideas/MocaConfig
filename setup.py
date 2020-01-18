@@ -25,7 +25,7 @@ setup(
     version=VERSION,
     license=license,
     install_requires=__requirements(),
-    author='el.ideal.ideas',
+    author='el.ideal-ideas',
     author_email='el.idealideas@gmail.com',
     url='https://github.com/el-ideal-ideas/MocaConfig',
     description='An JSON based config manager.',

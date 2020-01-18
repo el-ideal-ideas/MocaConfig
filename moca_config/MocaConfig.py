@@ -33,6 +33,7 @@ https://www.el-ideal-ideas.com
 # -- Imports --------------------------------------------------------------------------
 
 from typing import Any, Union, List, Tuple, Optional
+from moca_core import EL_S, MocaError
 from pathlib import Path
 from json import load, dump, JSONDecodeError
 from threading import Thread
@@ -55,7 +56,7 @@ from os import _exit
 # -- Exceptions --------------------------------------------------------------------------
 
 
-class MocaFileError(Exception):
+class MocaFileError(MocaError):
     """File Error"""
     pass
 
@@ -919,23 +920,7 @@ def main():
             print("ZH: 您指定的设定文件无法使用，请再次确认文件地址和文件权限。")
             print('------------------------------------------------------------------------ MocaFileError --')
     else:
-        print("""
-            Ω*
-                      ■          ■■■■■  
-                      ■         ■■   ■■ 
-                      ■        ■■     ■ 
-                      ■        ■■       
-            ■■■■■     ■        ■■■      
-           ■■   ■■    ■         ■■■     
-          ■■     ■■   ■          ■■■■   
-          ■■     ■■   ■            ■■■■ 
-          ■■■■■■■■■   ■              ■■■
-          ■■          ■               ■■
-          ■■          ■               ■■
-          ■■     ■    ■        ■■     ■■
-           ■■   ■■    ■   ■■■  ■■■   ■■ 
-            ■■■■■     ■   ■■■    ■■■■■
-        """)
+        print(EL_S)
         sleep(1)
         print("""
         ----------------------------------------------------------------------------

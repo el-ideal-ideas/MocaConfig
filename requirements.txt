@@ -1,3 +1,4 @@
+moca_core
 sanic
 sanic_openapi
 docopt

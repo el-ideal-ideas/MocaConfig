@@ -1,6 +1,6 @@
 from .MocaConfig import MocaConfig, MocaFileError, config_routes_v1, run_server, VERSION
 
-__copyright__ = 'Copyright (C) 2020.1.17'
+__copyright__ = 'Copyright (C) 2020.1.17 <el.ideal-ideas: https://www.el-ideal-ideas.com>'
 __version__ = VERSION
 __license__ = 'MIT'
 __author__ = 'el.ideal-ideas'
