@@ -43,7 +43,7 @@ from random import choice, randint
 from string import ascii_letters, digits
 from uuid import uuid1, uuid4
 from multiprocessing import current_process, cpu_count
-from sanic import Sanic, Blueprint
+from sanic import Sanic
 from sanic.response import redirect, text, json
 from sanic_openapi import doc, swagger_blueprint
 from sanic.exceptions import Forbidden, InvalidUsage
@@ -65,7 +65,7 @@ class MocaFileError(MocaError):
 # -- Variables --------------------------------------------------------------------------
 
 
-VERSION = '1.0.9'
+VERSION = '1.0.10'
 
 __USAGE = """
     Usage:
@@ -111,8 +111,6 @@ server_headers = {
     'Detail': 'This system is create by el.ideal-ideas, For more info,'
               ' please check www.el-ideal-ideas.com, or Twitter : @support_el_s',
 }
-
-config_routes_v1: Blueprint = Blueprint('config_routes_v1', url_prefix='config', version=1)
 
 # -------------------------------------------------------------------------- Variables --
 
@@ -841,17 +839,11 @@ def run_server(config_name: str = '',
     app.add_route(redirect_to_swagger_route, '/documentation', methods={'GET'})
     # add routes
     app.add_route(set_route_with_get_method, '/set', methods={'GET'})
-    config_routes_v1.add_route(set_route_with_get_method, '/set', methods={'GET'})
     app.add_route(set_route_with_post_method, '/set', methods={'POST', 'OPTIONS'})
-    config_routes_v1.add_route(set_route_with_post_method, '/set', methods={'POST', 'OPTIONS'})
     app.add_route(get_route_with_get_method, '/get', methods={'GET'})
-    config_routes_v1.add_route(get_route_with_get_method, '/get', methods={'GET'})
     app.add_route(get_route_with_post_method, '/get', methods={'POST', 'OPTIONS'})
-    config_routes_v1.add_route(get_route_with_post_method, '/get', methods={'POST', 'OPTIONS'})
     app.add_route(check_route_with_get_method, '/check', methods={'GET'})
-    config_routes_v1.add_route(check_route_with_get_method, '/check', methods={'GET'})
     app.add_route(check_route_with_post_method, '/check', methods={'POST', 'OPTIONS'})
-    config_routes_v1.add_route(check_route_with_post_method, '/check', methods={'POST', 'OPTIONS'})
     # run server
     app.run('0.0.0.0',
             port=port,
