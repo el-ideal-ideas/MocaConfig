@@ -1,12 +1,13 @@
 # System Requirements
 - Python >= 3.6
+- moca_core
 - sanic
 - sanic_openapi
 - docopt
 
 # Installation
 ```
-pip install moca_config==1.0.8
+pip install moca_config==1.0.9
 or
 pip install moca_config
 ```

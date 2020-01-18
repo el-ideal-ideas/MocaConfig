@@ -33,7 +33,7 @@ https://www.el-ideal-ideas.com
 # -- Imports --------------------------------------------------------------------------
 
 from typing import Any, Union, List, Tuple, Optional
-from moca_core import EL_S, MocaError
+from moca_core import EL_S, MocaError, N
 from pathlib import Path
 from json import load, dump, JSONDecodeError
 from threading import Thread
@@ -65,7 +65,7 @@ class MocaFileError(MocaError):
 # -- Variables --------------------------------------------------------------------------
 
 
-VERSION = '1.0.8'
+VERSION = '1.0.9'
 
 __USAGE = """
     Usage:
@@ -233,16 +233,16 @@ class MocaConfig(object):
                          sort_keys=False,
                          separators=(',', ': '))
             except (FileNotFoundError, PermissionError, OSError, Exception) as error:
-                raise MocaFileError(f"Can't create config file.\n"
-                                    f"Details: \n"
+                raise MocaFileError(f"Can't create config file.{N}"
+                                    f"Details: {N}"
                                     f"{error}")
         else:
             try:
                 with open(str(path), mode='r', encoding='utf-8') as _:
                     pass
             except (FileNotFoundError, PermissionError, OSError, Exception) as error:
-                raise MocaFileError(f"Can't open config file.\n"
-                                    f"Details: \n"
+                raise MocaFileError(f"Can't open config file.{N}"
+                                    f"Details: {N}"
                                     f"{error}")
         # set reload interval
         if isinstance(reload_interval, float) or isinstance(reload_interval, int):
