@@ -83,6 +83,7 @@ MocaConfigは独立動作する設定に関する機能と提供APIサーバー�
 MocaConfig也可以作为一个独立运行的提供关于设定的API服务器。
 详细信息请看用swagger生成的API文档。
 
+Swagger API Document: `<your ip>:<your port>/doc`
 ```bash
 moca_config ./config/config.json -p 5901 
 ```
