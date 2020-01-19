@@ -76,7 +76,7 @@ moca_config.check('lang', str, 'english')
 
 ```python
 # The __init__ method in MocaConfig class.
-# MocaConfigクラスのイニシャライズ。
+# MocaConfigクラスのイニシャライザー。
 # MocaConfig类的生成器。
 def __init__(self,
              name: str,
