@@ -373,13 +373,6 @@ You can use it with `moca_config` command in your terminal.
         -w | --workers <WORKERS>:          the number of workers.
 ```
 
-# Public Variables
-
-- config_routes_v1: Blueprint
-    - You can use this variable add config server apis to other sanic server.
-    - この変数を使用して設定サーバーのAPIを他のsanicサーバーに追加できます。
-    - 使用这个变量可以把设定服务器的API添加到其他的sanic服务器里面。
-    
 # License
 
 - MIT License
