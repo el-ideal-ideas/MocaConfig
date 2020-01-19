@@ -73,6 +73,30 @@ moca_config.set('lang', 'english')
 # 对比设定，如果lang设定的值是english则返回True。
 moca_config.check('lang', str, 'english')
 ```
+
+```python
+# The __init__ method in MocaConfig class.
+# MocaConfigクラスのイニシャライズ。
+# MocaConfig类的生成器。
+def __init__(self,
+             name: str,
+             filepath: Union[Path, str],
+             filename: str = '',
+             reload_interval: float = 5.0):
+    """
+    The initializer of MocaConfig class.
+    :param name: the name of this instance
+    :param filepath: the path of json config file.
+    :param filename: the name of json config file.
+    :param reload_interval: the interval to reload config file. if the value is -1, never reload config file
+
+    Raise
+    -----
+        TypeError: if the arguments type is incorrect.
+        MocaFileError: if can't find, open or create config file.
+    """
+```
+
 ###### Use in terminal
 MocaConfig can run as a standalone api(set or get config and so on) server.
 For more details, please read api documentation(swagger).
