@@ -328,7 +328,7 @@ def run_server(config_name: str = '',
 
     Raise
     _____
-        ValueError: if can't create MocaConfig isinstance with received arguments.
+        MocaUsageError: if can't create MocaConfig isinstance with received arguments.
         TypeError: from MocaConfig.__init__ method
         MocaFileError: from MocaConfig.__init__ method
     """

@@ -33,7 +33,7 @@ https://www.el-ideal-ideas.com
 # -- Imports --------------------------------------------------------------------------
 
 from typing import Any, Union, List, Tuple, Optional
-from moca_core import EL_S, MocaError, N
+from moca_core import EL_S, N, MocaFileError, MocaUsageError
 from pathlib import Path
 from json import load, dump, JSONDecodeError
 from threading import Thread
@@ -52,15 +52,6 @@ from docopt import docopt
 from os import _exit
 
 # -------------------------------------------------------------------------- Imports --
-
-# -- Exceptions --------------------------------------------------------------------------
-
-
-class MocaFileError(MocaError):
-    """File Error"""
-    pass
-
-# -------------------------------------------------------------------------- Exceptions --
 
 # -- Variables --------------------------------------------------------------------------
 
@@ -569,7 +560,7 @@ def run_server(config_name: str = '',
 
     Raise
     _____
-        ValueError: if can't create MocaConfig isinstance with received arguments.
+        MocaUsageError: if can't create MocaConfig isinstance with received arguments.
         TypeError: from MocaConfig.__init__ method
         MocaFileError: from MocaConfig.__init__ method
     """
@@ -586,7 +577,7 @@ def run_server(config_name: str = '',
     elif config_name != '' and filepath is not None:
         moca_config = MocaConfig(config_name, filepath, filename, reload_interval)
     else:
-        raise ValueError("Can't create MocaConfig instance with received arguments.")
+        raise MocaUsageError("Can't create MocaConfig instance with received arguments.")
     # set token
     moca_config.set('config_server_token', server_access_token)
     # initialize Sanic server
