@@ -41,8 +41,9 @@ MocaConfig类会每5（初期值）秒重新读取一次JSON文件。
 # インスタンス化。
 # 创建实例。
 moca_config = MocaConfig('test', './test/test.json')
+
 # Try get language config. 
-# if lang info is in the json file and it is string type,
+# If lang info is in the json file and it is string type,
 # return the value, if not, return default value.
 # 言語設定の取得を試みます。
 # もしlang項目がJSONファイルにありかつ文字列形式である場合。その値を返します。
@@ -51,10 +52,26 @@ moca_config = MocaConfig('test', './test/test.json')
 # 如果JSON文件里面有名为lang的数据，并且是文字列格式的话，返回其值。
 # 其他情况返回初始值。
 moca_config.get('lang', str, default='english')
+
+# If set any type to the argument. MocaConfig will return the config value without type check.
+# 第２引数をanyとして設定した場合、MocaConfigは返り値の型をチェックしません。
+# 如果第2个参数的值是any的话，MocaConfig不会对返回值进行类型检测。
+moca_config.get('lang', any, default='english')
+
+# If set auto_convert=True, MocaConfig will try convert the config value when the type of config value is incorrect
+# auto_convert=Trueが設定されている場合は設定データの形式が異なるとき、返り値の自動型変換を試みます。
+# 如果您设定了auto_convert=True，返回值的类型错误时，MocaConfig会对返回值尝试进行类型转换。
+moca_config.get('lang', str, default='english', auto_convert=True)
+
 # Set a config value, and update the json file.
 # 設定情報を追加してJSONファイルを更新します。
 # 添加设定信息并且更新JSON文件
 moca_config.set('lang', 'english')
+
+# Check the config value, if lang config is 'english', return True. 
+# 設定のチェック、もしlang設定がenglishの文字列である場合はTrueを返す。
+# 对比设定，如果lang设定的值是english则返回True。
+moca_config.check('lang', str, 'english')
 ```
 ###### Use in terminal
 MocaConfig can run as a standalone api(set or get config and so on) server.
