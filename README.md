@@ -196,7 +196,7 @@ print(moca_config.get(MocaConfig.NOW))
     - すべての設定の項目名を返す。
     - 返回所有设定的名称。
     
-- def get(key: str, res_type: Any = any, default: Any = None, auto_convert: bool = False, allow_el_command: bool = False) -> Any:
+- def get(key: str, res_type: Any = any, default: Any = None, auto_convert: bool = False, allow_el_command: bool = False, save_unknown_config: bool = True) -> Any:
     - Return the value of config.
     - 設定の値を返す。
     - 返回设定的值。
@@ -206,7 +206,8 @@ def get(self,
         res_type: Any = any,
         default: Any = None,
         auto_convert: bool = False,
-        allow_el_command: bool = False) -> Any:
+        allow_el_command: bool = False,
+        save_unknown_config: bool = True) -> Any:
     """
     return the config value.
     :param key: the config name.
@@ -214,6 +215,7 @@ def get(self,
     :param default: if can't found the config value, return default value.
     :param auto_convert: if the response type is incorrect, try convert the value.
     :param allow_el_command: use el command.
+    :param save_unknown_config: save the config value with default value when can't found the config value.
     :return: config value. if can't found the config value, return default value.
              if the response type is incorrect and can't convert the value, return default value.
     """

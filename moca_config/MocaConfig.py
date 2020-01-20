@@ -56,7 +56,7 @@ from os import _exit
 # -- Variables --------------------------------------------------------------------------
 
 
-VERSION = '1.0.11'
+VERSION = '1.0.12'
 
 __USAGE = """
     Usage:
@@ -400,7 +400,8 @@ class MocaConfig(object):
             res_type: Any = any,
             default: Any = None,
             auto_convert: bool = False,
-            allow_el_command: bool = False) -> Any:
+            allow_el_command: bool = False,
+            save_unknown_config: bool = True) -> Any:
         """
         return the config value.
         :param key: the config name.
@@ -408,6 +409,7 @@ class MocaConfig(object):
         :param default: if can't found the config value, return default value.
         :param auto_convert: if the response type is incorrect, try convert the value.
         :param allow_el_command: use el command.
+        :param save_unknown_config: save the config value with default value when can't found the config value.
         :return: config value. if can't found the config value, return default value.
                  if the response type is incorrect and can't convert the value, return default value.
         """
@@ -423,6 +425,8 @@ class MocaConfig(object):
             else:
                 value = self.__config_cache[key]
         except (KeyError, Exception):
+            if save_unknown_config:
+                self.set(key, default)
             return default
         if res_type is any:  # check response type
             return value
