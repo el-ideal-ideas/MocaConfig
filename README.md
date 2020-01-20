@@ -7,7 +7,7 @@
 
 # Installation
 ```
-pip install moca_config==1.0.11
+pip install moca_config==1.0.13
 or
 pip install moca_config
 ```
@@ -19,6 +19,7 @@ This config module is json based.
 All config data in the json file, will be loaded into memory, and can be used from MocaConfig class.
 MocaConfig class will reload the json file in 5(default value) seconds.
 If the json file was changed. the new config value will overwrite the old config value that in memory.
+
 ---
 ##### 日本語
 これはモカシステムのためにel.ideal-ideasによって開発された設定モジュールである。
@@ -26,6 +27,7 @@ If the json file was changed. the new config value will overwrite the old config
 JSONファイル内のすべての設定情報はメモリ内にロードされ、そしてMocaConfigクラスを経由して取得できます。
 MocaConfigクラスはデフォルト設定では5秒ごとJSONファイルをリロードします。
 JSONファイルに変更があった場合、その変更はメモリ内の設定情報にも反映されます。
+
 ---
 ##### 简体中文
 这是el.ideal-ideas为茉客系统开发的设定模块。
