@@ -1,13 +1,10 @@
 # System Requirements
-- Python >= 3.6
+- Python >= 3.7
 - moca_core
-- sanic
-- sanic_openapi
-- docopt
 
 # Installation
 ```
-pip install moca_config==1.0.13
+pip install moca_config==1.2.0
 or
 pip install moca_config
 ```
@@ -19,6 +16,9 @@ This config module is json based.
 All config data in the json file, will be loaded into memory, and can be used from MocaConfig class.
 MocaConfig class will reload the json file in 5(default value) seconds.
 If the json file was changed. the new config value will overwrite the old config value that in memory.
+If the config file contains `"__private__": True,` the config file will be a private file.
+If the config key is starts with `"_"` , the config will be a private config.
+If you want to access the private config, you should input the access token or the root password.
 
 ---
 ##### 日本語
@@ -27,6 +27,9 @@ If the json file was changed. the new config value will overwrite the old config
 JSONファイル内のすべての設定情報はメモリ内にロードされ、そしてMocaConfigクラスを経由して取得できます。
 MocaConfigクラスはデフォルト設定では5秒ごとJSONファイルをリロードします。
 JSONファイルに変更があった場合、その変更はメモリ内の設定情報にも反映されます。
+設定ファイルが`"__private__": True,`を含む場合、その設定ファイルはプライベートな設定ファイルになります。
+`"_"`から始まる設定内容も同様にプライベートになります。
+プライベートな設定情報にアクセスする場合、アクセストークンまたはrootパスワードが必要になります。
 
 ---
 ##### 简体中文
@@ -35,6 +38,9 @@ JSONファイルに変更があった場合、その変更はメモリ内の設�
 JSON文件内的所有设定信息会被保存到内存里，您可以通过MocaConfig类来获取各种设定信息。
 MocaConfig类会每5（初期值）秒重新读取一次JSON文件。
 如果JSON文件被改写，内存内的设定信息也会和JSON文件同步。
+如果设定文件包含`"__private__": True,`该设定文件则为隐私文件。
+如果设定key由`"_"`开始，该设定则为隐私设定。
+访问隐私设定的时候，需要输入access-token或者root密码。
 
 # Usage Example
 ###### Use in your application
@@ -84,34 +90,22 @@ def __init__(self,
              name: str,
              filepath: Union[Path, str],
              filename: str = '',
-             reload_interval: float = 5.0):
+             reload_interval: float = 5.0,
+             access_token: str = '',
+             **kwargs):
     """
     The initializer of MocaConfig class.
     :param name: the name of this instance
     :param filepath: the path of json config file.
     :param filename: the name of json config file.
     :param reload_interval: the interval to reload config file. if the value is -1, never reload config file
+    :param access_token: the access token of config file.
 
     Raise
     -----
         TypeError: if the arguments type is incorrect.
         MocaFileError: if can't find, open or create config file.
     """
-```
-
-###### Use in terminal
-MocaConfig can run as a standalone api(set or get config and so on) server.
-For more details, please read api documentation(swagger).
-
-MocaConfigは独立動作する設定に関する機能と提供APIサーバーとしても使用可能。
-詳細に関してはswaggerによって作られたAPIドキュメントをご覧ください。
-
-MocaConfig也可以作为一个独立运行的提供关于设定的API服务器。
-详细信息请看用swagger生成的API文档。
-
-Swagger API Document: `<your ip>:<your port>/doc`
-```bash
-moca_config ./config/config.json -p 5901 
 ```
 
 # MocaConfig Class
@@ -182,95 +176,181 @@ print(moca_config.get(MocaConfig.NOW))
 
 #### Public Methods
 
-###### Main Methods
+###### Main Class Methods
+
+- def set_root_pass(password: str) -> bool:
+    - Set the root password, only can run once.
+    - rootパスワードを設定します、一度しか実行できません。
+    - 设定root密码，仅可以执行一次。
+    
+- def change_root_pass(new_password: str, old_password: str) -> bool:
+    - Change root password.
+    - rootパスワードを変更します。
+    - 更改root密码。
+
+- def get_instance_list() -> List[str]:
+    - Get all name of instance as a list.
+    - すべてのインストールの名前をリストとして取得します。
+    - 以列表的格式获取所有实例名。
+    
+- def get_instance(name: str) -> Any:
+    - Get the created instance by name.
+    - 名前によって生成済みのインスタンスを取得します。
+    - 通过名字获取已生成的实例。
+
+###### Main Instance Methods
+
+- def change_reload_interval(interval: float) -> None:
+    - Change the interval to reload config file.
+    - 設定ファイルの再読み込み間隔を変更します。
+    - 更改设定文件的重新读取的间隔。
+    
+- def stop_auto_reload(self) -> None:
+    - Stop auto reload config file.
+    - 設定ファイルの自動再読み込みを停止します。
+    - 停止设定文件的自动重读。
+    
+- def change_config_file_path(path: Union[Path, str]) -> Path:
+    - Change the config file path.
+    - 設定ファイルのパスを変更します。
+    - 更改设定文件的地址。
+    
+- def reload_config() -> None:
+    - Reload json config file manually.
+    - JSON設定ファイルを手動で再読み込みします。
+    - 手动重读JSON设定文件。
+
 - def get_config_size() -> int:
     - Return the size of the config directory.
     - 設定情報の数を返す。
     - 返回设定信息的数量。
     
-- def get_all_config() -> dict:
+- def get_all_config(access_token: str = '', root_pass: str = '') -> Optional[dict]:
     - Return all configs as a dictionary
     - すべての設定情報を一つの辞書として返します。
     - 以字典格式返回所有的设定信息。
     
-- def get_all_config_key() -> tuple:
+def get_all_config_key(access_token: str = '', root_pass: str = '') -> Optional[Tuple]:
     - Return all config keys
     - すべての設定の項目名を返す。
     - 返回所有设定的名称。
     
-- def get(key: str, res_type: Any = any, default: Any = None, auto_convert: bool = False, allow_el_command: bool = False, save_unknown_config: bool = True) -> Any:
+- def get(key: str, res_type: Any = any, default: Any = None, auto_convert: bool = False, allow_el_command: bool = False, save_unknown_config: bool = True, access_token: str = '', root_pass: str = '') -> Any:
     - Return the value of config.
     - 設定の値を返す。
     - 返回设定的值。
 ```python
-def get(self,
-        key: str,
-        res_type: Any = any,
-        default: Any = None,
-        auto_convert: bool = False,
-        allow_el_command: bool = False,
-        save_unknown_config: bool = True) -> Any:
-    """
-    return the config value.
-    :param key: the config name.
-    :param res_type: the response type you want to get. if the value is <any>, don't check the response type.
-    :param default: if can't found the config value, return default value.
-    :param auto_convert: if the response type is incorrect, try convert the value.
-    :param allow_el_command: use el command.
-    :param save_unknown_config: save the config value with default value when can't found the config value.
-    :return: config value. if can't found the config value, return default value.
-             if the response type is incorrect and can't convert the value, return default value.
-    """
+    def get(self,
+            key: str,
+            res_type: Any = any,
+            default: Any = None,
+            auto_convert: bool = False,
+            allow_el_command: bool = False,
+            save_unknown_config: bool = True,
+            access_token: str = '',
+            root_pass: str = '') -> Any:
+        """
+        return the config value.
+        :param key: the config name.
+        :param res_type: the response type you want to get. if the value is <any>, don't check the response type.
+        :param default: if can't found the config value, return default value.
+        :param auto_convert: if the response type is incorrect, try convert the value.
+        :param allow_el_command: use el command.
+        :param save_unknown_config: save the config value with default value when can't found the config value.
+        :param access_token: the access token of config file.
+        :param root_pass: the root password.
+        :return: config value. if can't found the config value, return default value.
+                 if the response type is incorrect and can't convert the value, return default value.
+                 if can't access to the config file, return default value.
+        """
 ```
     
-- def set(key: str, value: Any) -> bool:
+- def set(key: str, value: Any, access_token: str = '', root_pass: str = '') -> Optional[bool]:
     - Set a value of config.
     - 値を設定項目に設定します。
     - 添加一个设定值。
 ```python
-def set(self,
-        key: str,
-        value: Any) -> bool:
-    """
-    set a config value.
-    if the key already exists, overwrite it.
-    :param key: the config name.
-    :param value: the config value.
-    :return: status, [success] or [failed]
-    """
+    def set(self,
+            key: str,
+            value: Any,
+            access_token: str = '',
+            root_pass: str = '') -> Optional[bool]:
+        """
+        set a config value.
+        if the key already exists, overwrite it.
+        :param key: the config name.
+        :param value: the config value.
+        :param access_token: the access token of config file.
+        :param root_pass: the root password.
+        :return: status, [success] or [failed], If can't access to the config file return None
+        """
 ```
+
+def remove_config(key: str, access_token: str = '', root_pass: str = '') -> Optional[bool]:
+    - Remove the config.
+    - 設定を作成します。
+    - 删除设定文件。
     
-- def check(key: str, res_type: Any, value: Any) -> bool:
+- def check(key: str, res_type: Any, value: Any, access_token: str = '', root_pass: str = '') -> Optional[bool]:
     - Check the value is same or not with config value.
     - 値が設定値と等しいかどうかをチェックします。
     - 检测参数值是否和设定值相同。
 ```python
-def check(self,
-          key: str,
-          res_type: Any,
-          value: Any) -> bool:
-    """
-    check is value correct.
-    :param key: the config name.
-    :param res_type: the config value type.
-    :param value: input value to check.
-    :return: status, [correct] or [incorrect]
-    """
+    def check(self,
+              key: str,
+              res_type: Any,
+              value: Any,
+              access_token: str = '',
+              root_pass: str = '') -> Optional[bool]:
+        """
+        check is value correct.
+        :param key: the config name.
+        :param res_type: the config value type.
+        :param value: input value to check.
+        :param access_token: the access token of config file.
+        :param root_pass: the root password.
+        :return: status, [correct] or [incorrect]. If can't access to this config file. return None.
+        """
 ```
 
-###### Optional Methods
+- def set_config_private() -> bool:
+    - Make this config file private.
+    - 設定ファイルにプライベート属性を設定します。
+    - 给设定文件添加隐私属性。
+    
+- def set_config_public(access_token: str = '', root_pass: str = '') -> Optional[bool]:
+    - Make this config file public.
+    - 設定ファイルに公開属性を設定します。
+    - 给设定文件添加公开属性。
+    
+- def is_private() -> bool:
+    - Check is the config private.
+    - 設定ファイルがプライベートかどうかをチェックします。
+    - 检测设定文件是否是隐私文件。
+    
+- def set_access_token(root_pass: str, token: str = '') -> Optional[bool]:
+    - Set a access token to config file.
+    - 設定ファイルにアクセストークンを追加します。
+    - 向设定文件添加access-token
+    
+- def check_access_token(root_pass: str, token: str) -> Optional[bool]:
+    - Check is access token correct.
+    - アクセストークンをチェックします。
+    - 检测access-token是否正确。
+    
+- def delete_this_config_file(access_token: str = '', root_pass: str = '') -> bool:
+    - Delete config file.
+    - 設定ファイルを削除します。
+    - 删除设定文件。
 
-- def reload_config() -> None:
-    - Reload json config file manually.
-    - JSON設定ファイルを手動で再読み込みします。
-    - 手动重读JSON设定文件。
+###### Optional Methods
     
 - def random_string(length: int) -> str:
     - Return random string with length argument.
     - 指定した長さのランダムな文字列を返す。
     - 返回指定长度的随机文字列。
     
-- random_integers(length: int) -> str:
+- def random_integers(length: int) -> str:
     - Return random string that made up of integers with length argument.
     - 指定した長さのランダムな数字によって構成された文字列を返す。
     - 返回指定长度的由随机数字组成的文字列。
@@ -284,98 +364,7 @@ def check(self,
     - Parse the special constants.
     - 特殊キーワードの解析用メソッド。
     - 用于解析特殊值的方法。
-    
-- def get_instance(name: str) -> Any:
-    - Get the created instance by name.
-    - 名前によって生成済みのインスタンスを取得します。
-    - 通过名字获取已生成的实例。
-    
-# Public Functions
-This Module only has one public function.
-The run_server function can run a standalone config server.
-About config server API please read swagger document in following URL.
-API Document URL: `<your ip>:<your port>/doc`
-
-このモジュールには１つだけ公開された関数があります。
-run_server関数を用いることで独立動作する設定サーバーを起動できます。
-設定サーバーのAPIに関してはswaggerを使用したドキュメントが用意されています。
-APIドキュメントのURL: `<your ip>:<your port>/doc`
-
-这个模块仅包含一个公开函数。
-通过run_server这个函数可以启动一个可以独立运行的设定服务器。
-设定服务器有自己的用swagger创建的API文档。
-API文档地址: `<your ip>:<your port>/doc`
-
-```python
-def run_server(config_name: str = '',
-               moca_config_instance: Optional[MocaConfig] = None,
-               filepath: Optional[Union[Path, str]] = None,
-               filename: str = '',
-               reload_interval: float = 5.0,
-               port: int = 5800,
-               server_access_token: str = '',
-               ssl: Optional[SSLContext] = None,
-               workers: int = 0,
-               **kwargs) -> None:
-    """
-    Create a MocaConfig instance and run sanic server.
-    :param config_name: the name of the MocaConfig instance
-    :param moca_config_instance the instance of MocaConfig class
-    :param filepath: the path of json config file.
-    :param filename: the name of json config file.
-    :param reload_interval: the interval to reload config file. if the value is -1, never reload config file
-    :param port: server port.
-    :param server_access_token: server access token.
-    :param ssl: ssl context.
-    :param workers: number of workers.
-    :return: None.
-
-    Raise
-    _____
-        MocaUsageError: if can't create MocaConfig isinstance with received arguments.
-        TypeError: from MocaConfig.__init__ method
-        MocaFileError: from MocaConfig.__init__ method
-    """
-```
-
-# Global command
-This module will install a global command in your system.
-You can use it with `moca_config` command in your terminal.
-
-このモジュールはシステムにグローバルなコマンドを追加します。
-`moca_config`という名前でターミナルから使用可能です。
-
-本模块还会在系统内安装一个全局指令。
-您可以在终端通过`moca_config`指令来使用。
-```
-    Usage:
-        moca_config
-        moca_config help
-        moca_config PATH [-p|--port <PORT>] [-n|--name <NAME>] [-t|--token <TOKEN>] [-w|--workers <WORKERS>] 
-                         [-c|--certfile <CERT_PATH>] [-k|--keyfile <KEY_PATH>] [-i|--interval <RELOAD_INTERVAL>] 
-
-    MocaConfig Module
-    
-    Arguments:
-        PATH:            the path of config file.
-        PORT:            the port number of config server.
-        NAME:            the name of config instance.
-        TOKEN:           the access token of config server.
-        CERT_PATH:       the certificate file path(for ssl connection).
-        KEY_PATH:        the private key file path(for ssl connection).
-        RELOAD_INTERVAL: the reload interval of config server.
-        WORKERS:         the number of workers.
-        
-    Options:
-        help:                              show the help.
-        -p | --port <PORT>:                config server port number.
-        -n | --name <NAME>:                config name.
-        -t | --token <TOKEN>:              the access token of config server.
-        -c | --certfile <CERT_PATH>:       the path of the certificate file.
-        -k | --keyfile <KEY_PATH>:         the path of the private key file.
-        -i | --interval <RELOAD_INTERVAL>: the reload interval of config server.
-        -w | --workers <WORKERS>:          the number of workers.
-```
+   
 
 # License
 
@@ -410,11 +399,3 @@ THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 # Other Information
 - el.ideal-ideas
     - https://www.el-ideal-ideas.com
-- Sanic
-    - https://github.com/huge-success/sanic
-- Sanic License Info
-    - https://github.com/huge-success/sanic-openapi/blob/master/LICENSE
-- Sanic OpenAPI License Info
-    - https://github.com/huge-success/sanic-openapi/blob/master/LICENSE
-- Docpt License Info
-    - https://github.com/docopt/docopt/blob/master/LICENSE-MIT

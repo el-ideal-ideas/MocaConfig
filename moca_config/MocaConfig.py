@@ -33,75 +33,21 @@ https://www.el-ideal-ideas.com
 # -- Imports --------------------------------------------------------------------------
 
 from typing import Any, Union, List, Tuple, Optional
-from moca_core import EL_S, N, MocaFileError, MocaUsageError
+from moca_core import N, MocaFileError, run_on_other_thread, MOCHI_MOCHI
 from pathlib import Path
 from json import load, dump, JSONDecodeError
-from threading import Thread
 from time import sleep
 from datetime import datetime
 from random import choice, randint
 from string import ascii_letters, digits
 from uuid import uuid1, uuid4
 from multiprocessing import current_process, cpu_count
-from sanic import Sanic
-from sanic.response import redirect, text, json
-from sanic_openapi import doc, swagger_blueprint
-from sanic.exceptions import Forbidden, InvalidUsage
-from ssl import SSLContext, create_default_context, Purpose
-from docopt import docopt
-from os import _exit
 
 # -------------------------------------------------------------------------- Imports --
 
 # -- Variables --------------------------------------------------------------------------
 
-
-VERSION = '1.0.13'
-
-__USAGE = """
-    Usage:
-        moca_config
-        moca_config help
-        moca_config PATH [-p|--port <PORT>] [-n|--name <NAME>] [-t|--token <TOKEN>] [-w|--workers <WORKERS>] 
-                         [-c|--certfile <CERT_PATH>] [-k|--keyfile <KEY_PATH>] [-i|--interval <RELOAD_INTERVAL>] 
-                         [mochi]
-        
-    MocaConfig Module
-    
-    Arguments:
-        PATH:            the path of config file.
-        PORT:            the port number of config server.
-        NAME:            the name of config instance.
-        TOKEN:           the access token of config server.
-        CERT_PATH:       the certificate file path(for ssl connection).
-        KEY_PATH:        the private key file path(for ssl connection).
-        RELOAD_INTERVAL: the reload interval of config server.
-        WORKERS:         the number of workers.
-        
-    Options:
-        help:                              show the help.
-        -p | --port <PORT>:                config server port number.
-        -n | --name <NAME>:                config name.
-        -t | --token <TOKEN>:              the access token of config server.
-        -c | --certfile <CERT_PATH>:       the path of the certificate file.
-        -k | --keyfile <KEY_PATH>:         the path of the private key file.
-        -i | --interval <RELOAD_INTERVAL>: the reload interval of config server.
-        -w | --workers <WORKERS>:          the number of workers.
-        mochi:                             もっちもっちにゃんにゃん
-"""
-
-__HELP = """
-EN: This command can run a standalone config server.
-JA: このコマンドは独立動作する設定サーバーを立ち上げることができます。
-ZH: 本命令可以启动一个能独立运行的设定服务器。
-"""
-
-server_headers = {
-    'X-Served-By': 'Sanic: Moca-System(Python): Y',
-    'Access-Control-Allow-Origin': '*',
-    'Detail': 'This system is create by el.ideal-ideas, For more info,'
-              ' please check www.el-ideal-ideas.com, or Twitter : @support_el_s',
-}
+VERSION = '1.2.1'
 
 # -------------------------------------------------------------------------- Variables --
 
@@ -110,30 +56,42 @@ server_headers = {
 
 class MocaConfig(object):
     """
+    -- english --------------------------------------------------------------------------
     This is the config module developed by el.ideal-ideas for Moca System.
     This config module is json based.
     All config data in the json file, will be loaded into memory, and can be used from MocaConfig class.
     MocaConfig class will reload the json file in 5(default value) seconds.
     If the json file was changed. the new config value will overwrite the old config value that in memory.
-    -------
+    If the config file contains "__private__": True, the config file will be a private file.
+    If the config key is starts with "_" , the config will be a private config.
+    If you want to access the private config, you should input the access token or the root password.
+
+    -- 日本語 --------------------------------------------------------------------------
     これはモカシステムのためにel.ideal-ideasによって開発された設定モジュールである。
     この設定モジュールはJSON形式を採用しています。
     JSONファイル内のすべての設定情報はメモリ内にロードされ、そしてMocaConfigクラスを経由して取得できます。
     MocaConfigクラスはデフォルト設定では5秒ごとJSONファイルをリロードします。
     JSONファイルに変更があった場合、その変更はメモリ内の設定情報にも反映されます。
-    -------
+    設定ファイルが"__private__": True,を含む場合、その設定ファイルはプライベートな設定ファイルになります。
+    "_"から始まる設定内容も同様にプライベートになります。
+    プライベートな設定情報にアクセスする場合、アクセストークンまたはrootパスワードが必要になります。
+
+    -- 中文 --------------------------------------------------------------------------
     这是el.ideal-ideas为茉客系统开发的设定模块。
     这个设定模块采用了JSON格式。
     JSON文件内的所有设定信息会被保存到内存里，您可以通过MocaConfig类来获取各种设定信息。
     MocaConfig类会每5（初期值）秒重新读取一次JSON文件。
     如果JSON文件被改写，内存内的设定信息也会和JSON文件同步。
+    如果设定文件包含"__private__": True,该设定文件则为隐私文件。
+    如果设定key由"_"开始，该设定则为隐私设定。
+    访问隐私设定的时候，需要输入access-token或者root密码。
 
     Attributes
     ----------
-    path: Path
+    __path: Path
         the config file path
 
-    reload_interval: float
+    __reload_interval: float
         the reload interval
 
     __config_cache: dict
@@ -144,9 +102,12 @@ class MocaConfig(object):
     """
 
     __INIT_MSG = {
-        "__MocaConfig": "Welcome to MocaConfig, the config module is now available.",
-        "__MocaConfig_version": VERSION
+        "__MocaConfig__": "Welcome to MocaConfig, the config module is now available.",
+        "__MocaConfig_version__": VERSION,
+        "__private__": False,
     }
+
+    __ROOT_PASS = ''
 
     __instance_list: dict = {}
 
@@ -173,24 +134,32 @@ class MocaConfig(object):
     PROCESS_NAME: str = '[el]#moca_process_name#'  # process name
     CPU_COUNT: str = '[el]#moca_cpu_count#'  # cpu count
     GET_ALL_CONFIG: str = '[el]#moca_get_all_config#'  # get all config
+    MOCHI: str = '[el]#moca_mochi#'  # もっちもっちにゃんにゃん
 
     def __init__(self,
                  name: str,
                  filepath: Union[Path, str],
                  filename: str = '',
-                 reload_interval: float = 5.0):
+                 reload_interval: float = 5.0,
+                 access_token: str = '',
+                 **kwargs):
         """
         The initializer of MocaConfig class.
         :param name: the name of this instance
         :param filepath: the path of json config file.
         :param filename: the name of json config file.
         :param reload_interval: the interval to reload config file. if the value is -1, never reload config file
+        :param access_token: the access token of config file.
 
         Raise
         -----
             TypeError: if the arguments type is incorrect.
             MocaFileError: if can't find, open or create config file.
         """
+        #############################
+        if kwargs.get('mochi', False):
+            MocaConfig.__INIT_MSG['__mochi__'] = 'もっちもっちにゃんにゃん'
+        #############################
         # set config file path
         path: Path
         if isinstance(filepath, Path):  # check filepath parameter
@@ -208,13 +177,133 @@ class MocaConfig(object):
             raise TypeError('Argument type error, '
                             'Expected filename: str, '
                             f'But received filename: {type(filename)}')
-        self.path: Path = path
-        # check config file
-        if not path.is_file():  # if file is not exist, create it
-            if not path.parent.is_dir():
-                path.parent.mkdir(parents=True)
+        self.__path: Path = self.change_config_file_path(path)  # this method can raise MocaFileError.
+        # set reload interval
+        if isinstance(reload_interval, float) or isinstance(reload_interval, int):
+            self.__reload_interval: float = float(reload_interval)
+        else:
+            TypeError('Argument type error, '
+                      'Expected reload_interval: float, '
+                      f'But received reload_interval: {type(reload_interval)}')
+        # initialize cache variable
+        self.__config_cache: dict = {}
+        # set current status
+        self.__status: int = MocaConfig.CORRECT
+        # load config file
+        self.reload_config()
+        # start reload-config-loop on other thread
+        run_on_other_thread(self.__reload_config_loop)
+        # add self to instance list
+        MocaConfig.__instance_list[name] = self
+        # write access token
+        self.set('__moca_config_access_token__', access_token, root_pass=MocaConfig.__ROOT_PASS)
+
+    # ----------------------------------------------------------------------------
+    # ----------------------------------------------------------------------------
+
+    @property
+    def status(self) -> int:
+        """Return the self.__status"""
+        return self.__status
+
+    # ----------------------------------------------------------------------------
+    # ----------------------------------------------------------------------------
+
+    @classmethod
+    def set_root_pass(cls,
+                      password: str) -> bool:
+        """
+        Root password only can set once.
+        :param password: the root password.
+        :return: status, [success] or [failed]
+        """
+        if cls.__ROOT_PASS == '':
+            cls.__ROOT_PASS = password
+            return True
+        else:
+            return False
+
+    # ----------------------------------------------------------------------------
+    # ----------------------------------------------------------------------------
+
+    @classmethod
+    def change_root_pass(cls,
+                         new_password: str,
+                         old_password: str) -> bool:
+        """
+        Change the root password.
+        :param new_password: the new root password.
+        :param old_password: the old root password.
+        :return: status, [success] or [failed]
+        """
+        if cls.__ROOT_PASS == old_password:
+            cls.__ROOT_PASS = new_password
+            return True
+        else:
+            return False
+
+    # ----------------------------------------------------------------------------
+    # ----------------------------------------------------------------------------
+
+    @property
+    def path(self) -> Path:
+        """Return the self.__path"""
+        return self.__path
+
+    # ----------------------------------------------------------------------------
+    # ----------------------------------------------------------------------------
+
+    @property
+    def reload_interval(self) -> float:
+        """Return the self.__reload_interval"""
+        return self.__reload_interval
+
+    # ----------------------------------------------------------------------------
+    # ----------------------------------------------------------------------------
+
+    @classmethod
+    def get_instance_list(cls) -> List[str]:
+        """Return a list of instance names"""
+        return list(cls.__instance_list.keys())
+
+    # ----------------------------------------------------------------------------
+    # ----------------------------------------------------------------------------
+
+    def change_reload_interval(self,
+                               interval: float) -> None:
+        """Change the reload interval"""
+        self.__reload_interval = interval
+
+    # ----------------------------------------------------------------------------
+    # ----------------------------------------------------------------------------
+
+    def stop_auto_reload(self) -> None:
+        """Stop auto reload"""
+        self.__reload_interval = -1
+
+    # ----------------------------------------------------------------------------
+    # ----------------------------------------------------------------------------
+
+    def change_config_file_path(self,
+                                path: Union[Path, str]) -> Path:
+        """
+        Change the path of config file.
+        :param path: the path of the config file.
+        :return: the path of the config file.
+        Arise
+        -----
+            MocaFileError: If can't change the path of config file.
+        """
+        config_file_path: Path
+        if isinstance(path, str):
+            config_file_path = Path(path)
+        else:
+            config_file_path = path
+        if not config_file_path.is_file():  # if file is not exist, create it
+            if not config_file_path.parent.is_dir():
+                config_file_path.parent.mkdir(parents=True, exist_ok=True)
             try:
-                with open(str(path), mode='w', encoding='utf-8') as config_file:
+                with open(str(config_file_path), mode='w', encoding='utf-8') as config_file:
                     dump(MocaConfig.__INIT_MSG,
                          config_file,
                          ensure_ascii=False,
@@ -227,38 +316,14 @@ class MocaConfig(object):
                                     f"{error}")
         else:
             try:
-                with open(str(path), mode='r', encoding='utf-8') as _:
+                with open(str(config_file_path), mode='r', encoding='utf-8') as _:
                     pass
             except (FileNotFoundError, PermissionError, OSError, Exception) as error:
                 raise MocaFileError(f"Can't open config file.{N}"
                                     f"Details: {N}"
                                     f"{error}")
-        # set reload interval
-        if isinstance(reload_interval, float) or isinstance(reload_interval, int):
-            self.reload_interval: float = float(reload_interval)
-        else:
-            TypeError('Argument type error, '
-                      'Expected reload_interval: float, '
-                      f'But received reload_interval: {type(reload_interval)}')
-        # initialize cache variable
-        self.__config_cache: dict = {}
-        # set current status
-        self.__status: int = MocaConfig.CORRECT
-        # load config file
-        self.reload_config()
-        # start reload-config-loop on other thread
-        loop_thread = Thread(target=self.__reload_config_loop)
-        loop_thread.start()
-        # add self to instance list
-        MocaConfig.__instance_list[name] = self
-
-    # ----------------------------------------------------------------------------
-    # ----------------------------------------------------------------------------
-
-    @property
-    def status(self):
-        """Return the self.status"""
-        return self.__status
+        self.__path = config_file_path
+        return config_file_path
 
     # ----------------------------------------------------------------------------
     # ----------------------------------------------------------------------------
@@ -330,16 +395,53 @@ class MocaConfig(object):
     # ----------------------------------------------------------------------------
     # ----------------------------------------------------------------------------
 
-    def get_all_config(self) -> dict:
-        """Return all config"""
-        return self.__config_cache
+    def get_all_config(self,
+                       access_token: str = '',
+                       root_pass: str = '') -> Optional[dict]:
+        """
+        Return all config.
+        :param access_token: the access token of config file.
+        :param root_pass: the root password.
+        :return: if can't access to the config file, return None
+        """
+        if self.is_private():
+            if (MocaConfig.__ROOT_PASS == root_pass) or bool(self.check_access_token(MocaConfig.__ROOT_PASS,
+                                                                                     access_token)):
+                return self.__config_cache
+            else:
+                return None
+        else:
+            if (MocaConfig.__ROOT_PASS == root_pass) or bool(self.check_access_token(MocaConfig.__ROOT_PASS,
+                                                                                     access_token)):
+                return self.__config_cache
+            else:
+                return {key: value for key, value in self.__config_cache.items() if not key.startswith('_')}
 
     # ----------------------------------------------------------------------------
     # ----------------------------------------------------------------------------
 
-    def get_all_config_key(self) -> tuple:
-        """Return all key in self.__config_cache."""
-        return tuple(self.__config_cache.keys())
+    def get_all_config_key(self,
+                           access_token: str = '',
+                           root_pass: str = '') -> Optional[Tuple]:
+        """
+        Return all key in self.__config_cache.
+        If the access token or root password is correct, the response will contains private configs.
+        :param access_token: the access token of config file.
+        :param root_pass: the root password.
+        :return: if can't access to the config file, return None
+        """
+        if self.is_private():
+            if (MocaConfig.__ROOT_PASS == root_pass) or bool(self.check_access_token(MocaConfig.__ROOT_PASS,
+                                                                                     access_token)):
+                return tuple(self.__config_cache.keys())
+            else:
+                return None
+        else:
+            if (MocaConfig.__ROOT_PASS == root_pass) or bool(self.check_access_token(MocaConfig.__ROOT_PASS,
+                                                                                     access_token)):
+                return tuple(self.__config_cache.keys())
+            else:
+                return tuple([key for key in self.__config_cache.keys() if not key.startswith('_')])
 
     # ----------------------------------------------------------------------------
     # ----------------------------------------------------------------------------
@@ -389,6 +491,8 @@ class MocaConfig(object):
             return True, current_process().name
         elif command == cls.CPU_COUNT:
             return True, cpu_count()
+        elif command == cls.MOCHI:
+            return True, MOCHI_MOCHI
         else:
             return False, None
 
@@ -401,7 +505,9 @@ class MocaConfig(object):
             default: Any = None,
             auto_convert: bool = False,
             allow_el_command: bool = False,
-            save_unknown_config: bool = True) -> Any:
+            save_unknown_config: bool = True,
+            access_token: str = '',
+            root_pass: str = '') -> Any:
         """
         return the config value.
         :param key: the config name.
@@ -410,66 +516,88 @@ class MocaConfig(object):
         :param auto_convert: if the response type is incorrect, try convert the value.
         :param allow_el_command: use el command.
         :param save_unknown_config: save the config value with default value when can't found the config value.
+        :param access_token: the access token of config file.
+        :param root_pass: the root password.
         :return: config value. if can't found the config value, return default value.
                  if the response type is incorrect and can't convert the value, return default value.
+                 if can't access to the config file, return default value.
         """
-        if key == MocaConfig.GET_ALL_CONFIG:
-            return self.__config_cache
-        try:
-            if allow_el_command:
-                status, response = self.el_command_parser(key)
-                if status:
-                    value = response
+        allow: bool
+        if self.is_private():
+            if (MocaConfig.__ROOT_PASS == root_pass) or bool(self.check_access_token(MocaConfig.__ROOT_PASS,
+                                                                                     access_token)):
+                allow = True
+            else:
+                allow = False
+        else:
+            if key.startswith('_'):
+                if (MocaConfig.__ROOT_PASS == root_pass) or bool(self.check_access_token(MocaConfig.__ROOT_PASS,
+                                                                                         access_token)):
+                    allow = True
+                else:
+                    allow = False
+            else:
+                allow = True
+        if allow:
+            if key == MocaConfig.GET_ALL_CONFIG:
+                return self.__config_cache
+            try:
+                if allow_el_command:
+                    status, response = self.el_command_parser(key)
+                    if status:
+                        value = response
+                    else:
+                        value = self.__config_cache[key]
                 else:
                     value = self.__config_cache[key]
-            else:
-                value = self.__config_cache[key]
-        except (KeyError, Exception):
-            if save_unknown_config:
-                self.set(key, default)
-            return default
-        if res_type is any:  # check response type
-            return value
-        elif isinstance(value, res_type):
-            return value
-        elif auto_convert:
-            if res_type is str:
-                return str(value)
-            elif res_type is int:
-                try:
-                    return int(value)
-                except (TypeError, ValueError, Exception):
-                    return default
-            elif res_type is float:
-                try:
-                    return float(value)
-                except (TypeError, ValueError, Exception):
-                    return default
-            elif res_type is bool:
-                return bool(value)
-            elif res_type is tuple:
-                try:
-                    return tuple([item for item in value])
-                except (TypeError, Exception):
-                    return default
-            elif res_type is list:
-                try:
-                    return [item for item in value]
-                except (TypeError, Exception):
-                    return default
-            elif res_type is dict:
-                try:
-                    index = 0
-                    res = {}
-                    for item in value:
-                        res[index] = item
-                        index += 1
-                except (TypeError, Exception):
-                    return default
-            elif res_type is set:
-                try:
-                    return {item for item in value}
-                except (TypeError, Exception):
+            except (KeyError, Exception):
+                if save_unknown_config:
+                    self.set(key, default)
+                return default
+            if res_type is any:  # check response type
+                return value
+            elif isinstance(value, res_type):
+                return value
+            elif auto_convert:
+                if res_type is str:
+                    return str(value)
+                elif res_type is int:
+                    try:
+                        return int(value)
+                    except (TypeError, ValueError, Exception):
+                        return default
+                elif res_type is float:
+                    try:
+                        return float(value)
+                    except (TypeError, ValueError, Exception):
+                        return default
+                elif res_type is bool:
+                    return bool(value)
+                elif res_type is tuple:
+                    try:
+                        return tuple([item for item in value])
+                    except (TypeError, Exception):
+                        return default
+                elif res_type is list:
+                    try:
+                        return [item for item in value]
+                    except (TypeError, Exception):
+                        return default
+                elif res_type is dict:
+                    try:
+                        index = 0
+                        res = {}
+                        for item in value:
+                            res[index] = item
+                            index += 1
+                    except (TypeError, Exception):
+                        return default
+                elif res_type is set:
+                    try:
+                        return {item for item in value}
+                    except (TypeError, Exception):
+                        return default
+                else:
                     return default
             else:
                 return default
@@ -479,18 +607,12 @@ class MocaConfig(object):
     # ----------------------------------------------------------------------------
     # ----------------------------------------------------------------------------
 
-    def set(self,
-            key: str,
-            value: Any) -> bool:
+    def __save_config_to_file(self) -> bool:
         """
-        set a config value.
-        if the key already exists, overwrite it.
-        :param key: the config name.
-        :param value: the config value.
+        Save the config data to config file
         :return: status, [success] or [failed]
         """
         try:
-            self.__config_cache[key] = value
             with open(str(self.path), mode='w', encoding='utf-8') as config_file:
                 dump(self.__config_cache,
                      config_file,
@@ -500,8 +622,83 @@ class MocaConfig(object):
                      separators=(',', ': '))
             return True
         except (FileNotFoundError, PermissionError, OSError, Exception):
-            del self.__config_cache[key]
             return False
+
+    # ----------------------------------------------------------------------------
+    # ----------------------------------------------------------------------------
+
+    def set(self,
+            key: str,
+            value: Any,
+            access_token: str = '',
+            root_pass: str = '') -> Optional[bool]:
+        """
+        set a config value.
+        if the key already exists, overwrite it.
+        :param key: the config name.
+        :param value: the config value.
+        :param access_token: the access token of config file.
+        :param root_pass: the root password.
+        :return: status, [success] or [failed], If can't access to the config file return None
+        """
+        allow: bool
+        if self.is_private():
+            if (MocaConfig.__ROOT_PASS == root_pass) or bool(self.check_access_token(MocaConfig.__ROOT_PASS,
+                                                                                     access_token)):
+                allow = True
+            else:
+                allow = False
+        else:
+            if key.startswith('_'):
+                if (MocaConfig.__ROOT_PASS == root_pass) or bool(self.check_access_token(MocaConfig.__ROOT_PASS,
+                                                                                         access_token)):
+                    allow = True
+                else:
+                    allow = False
+            else:
+                allow = True
+        if allow:
+            self.__config_cache[key] = value
+            res = self.__save_config_to_file()
+            if res:
+                return True
+            else:
+                try:
+                    del self.__config_cache[key]
+                except KeyError:
+                    pass
+                return False
+        else:
+            return None
+
+    # ----------------------------------------------------------------------------
+    # ----------------------------------------------------------------------------
+
+    def remove_config(self,
+                      key: str,
+                      access_token: str = '',
+                      root_pass: str = '') -> Optional[bool]:
+        """
+        Remove a config data.
+        :param key: the config key.
+        :param access_token: the access token of config file.
+        :param root_pass: the root password.
+        :return: status, [success] or [failed]. If can't access to this config file. return None.
+        """
+        if (MocaConfig.__ROOT_PASS == root_pass) or bool(self.check_access_token(MocaConfig.__ROOT_PASS, access_token)):
+            try:
+                value = self.__config_cache[key]
+                del self.__config_cache[key]
+                res = self.__save_config_to_file()
+                if res:
+                    return True
+                else:
+                    self.__config_cache[key] = value
+                    return False
+            except KeyError:
+                return False
+        else:
+            return None
 
     # ----------------------------------------------------------------------------
     # ----------------------------------------------------------------------------
@@ -509,15 +706,34 @@ class MocaConfig(object):
     def check(self,
               key: str,
               res_type: Any,
-              value: Any) -> bool:
+              value: Any,
+              access_token: str = '',
+              root_pass: str = '') -> Optional[bool]:
         """
         check is value correct.
         :param key: the config name.
         :param res_type: the config value type.
         :param value: input value to check.
-        :return: status, [correct] or [incorrect]
+        :param access_token: the access token of config file.
+        :param root_pass: the root password.
+        :return: status, [correct] or [incorrect]. If can't access to this config file. return None.
         """
-        return self.get(key, res_type, allow_el_command=False) == value
+        status = self.get(key, res_type, allow_el_command=False) == value
+        if self.is_private():
+            if (MocaConfig.__ROOT_PASS == root_pass) or bool(self.check_access_token(MocaConfig.__ROOT_PASS,
+                                                                                     access_token)):
+                return status
+            else:
+                return None
+        else:
+            if key.startswith('_'):
+                if (MocaConfig.__ROOT_PASS == root_pass) or bool(self.check_access_token(MocaConfig.__ROOT_PASS,
+                                                                                         access_token)):
+                    return status
+                else:
+                    return None
+            else:
+                return status
 
     # ----------------------------------------------------------------------------
     # ----------------------------------------------------------------------------
@@ -534,409 +750,102 @@ class MocaConfig(object):
     # ----------------------------------------------------------------------------
     # ----------------------------------------------------------------------------
 
+    def set_config_private(self) -> bool:
+        """
+        Set the config private. Can't access without access token.
+        :return: status, [success] or [failed]
+        """
+        return bool(self.set('__private__', True, root_pass=MocaConfig.__ROOT_PASS))
+
+    # ----------------------------------------------------------------------------
+    # ----------------------------------------------------------------------------
+
+    def set_config_public(self,
+                          access_token: str = '',
+                          root_pass: str = '') -> Optional[bool]:
+        """
+        Set the config public. Can access without access token.'
+        :param access_token: the access token of config file.
+        :param root_pass: the root password.
+        :return: status, [success] or [failed]
+        """
+        return self.set('__private__', False, access_token=access_token, root_pass=root_pass)
+
+    # ----------------------------------------------------------------------------
+    # ----------------------------------------------------------------------------
+
+    def is_private(self) -> bool:
+        """Check is config private"""
+        return self.get('__private__', bool, default=True, root_pass=MocaConfig.__ROOT_PASS)
+
+    # ----------------------------------------------------------------------------
+    # ----------------------------------------------------------------------------
+
+    def set_access_token(self,
+                         root_pass: str,
+                         token: str = '') -> Optional[bool]:
+        """
+        Set a access token for config file.
+        :param root_pass: the root password.
+        :param token: the access token of config file. if the value is empty string, use a random token.
+        :return status, [success] or [failed]. If can't access to this config file. return None.
+        """
+        if token == '':
+            access_token = self.random_string(64)
+        else:
+            access_token = token
+        return self.set('__moca_config_access_token__', access_token, root_pass=root_pass)
+
+    # ----------------------------------------------------------------------------
+    # ----------------------------------------------------------------------------
+
+    def check_access_token(self,
+                           root_pass: str,
+                           token: str) -> Optional[bool]:
+        """
+        Check is the access token of config file correct.
+        :param root_pass: the root password.
+        :param token: config file access token.
+        :return: status, [correct] or [incorrect]. If can't access to this config file. return None.'
+        """
+        return self.check('__moca_config_access_token__', str, token, root_pass=root_pass)
+
+    # ----------------------------------------------------------------------------
+    # ----------------------------------------------------------------------------
+
+    def delete_this_config_file(self,
+                                access_token: str = '',
+                                root_pass: str = '') -> bool:
+        """
+        Delete the config file.
+        :param access_token: the access token of config file.
+        :param root_pass: the root password.
+        :return: status, [success] or [failed]
+        """
+        if (MocaConfig.__ROOT_PASS == root_pass) or bool(self.check_access_token(MocaConfig.__ROOT_PASS,
+                                                                                 access_token)):
+            try:
+                self.__path.unlink()
+                return True
+            except (FileNotFoundError, PermissionError, OSError, Exception):
+                return False
+        else:
+            return False
+
+    # ----------------------------------------------------------------------------
+    # ----------------------------------------------------------------------------
+
+    @staticmethod
+    def mochi() -> str:
+        """٩(ˊᗜˋ*)و"""
+        return MOCHI_MOCHI
+
+    # ----------------------------------------------------------------------------
+    # ----------------------------------------------------------------------------
+
+    @staticmethod
+    def print_mochi() -> None:
+        """♫ヽ(゜∇゜ヽ)♪"""
+        print(MocaConfig.mochi())
+
 # -------------------------------------------------------------------------- Main Class --
-
-# -- Public Functions --------------------------------------------------------------------------
-
-
-def run_server(config_name: str = '',
-               moca_config_instance: Optional[MocaConfig] = None,
-               filepath: Optional[Union[Path, str]] = None,
-               filename: str = '',
-               reload_interval: float = 5.0,
-               port: int = 5800,
-               server_access_token: str = '',
-               ssl: Optional[SSLContext] = None,
-               workers: int = 0,
-               **kwargs) -> None:
-    """
-    Create a MocaConfig instance and run sanic server.
-    :param config_name: the name of the MocaConfig instance
-    :param moca_config_instance the instance of MocaConfig class
-    :param filepath: the path of json config file.
-    :param filename: the name of json config file.
-    :param reload_interval: the interval to reload config file. if the value is -1, never reload config file
-    :param port: server port.
-    :param server_access_token: server access token.
-    :param ssl: ssl context.
-    :param workers: number of workers.
-    :return: None.
-
-    Raise
-    _____
-        MocaUsageError: if can't create MocaConfig isinstance with received arguments.
-        TypeError: from MocaConfig.__init__ method
-        MocaFileError: from MocaConfig.__init__ method
-    """
-    #############################
-    if kwargs.get('mochi', False):
-        server_headers['MOCHI'] = 'もっちもっちにゃんにゃん'
-    #############################
-    # create instance
-    moca_config: MocaConfig
-    if moca_config_instance is not None and isinstance(moca_config_instance, MocaConfig):
-        moca_config = moca_config_instance
-    elif MocaConfig.get_instance(config_name) is not None:
-        moca_config = MocaConfig.get_instance(config_name)
-    elif config_name != '' and filepath is not None:
-        moca_config = MocaConfig(config_name, filepath, filename, reload_interval)
-    else:
-        raise MocaUsageError("Can't create MocaConfig instance with received arguments.")
-    # set token
-    moca_config.set('config_server_token', server_access_token)
-    # initialize Sanic server
-    app = Sanic('MocaConfig')
-    app.config["API_TITLE"] = 'MocaConfig'
-    app.config["API_DESCRIPTION"] = """
-    EN: Common Server Side APIs for front-end applications.
-    JA: フロントエンドアプリケーション開発のための、サーバーサイドの共通API。
-    ZH: 为前端软件开发准备的，通用型服务器端API群。
-    """
-    app.config["API_TERMS_OF_SERVICE"] = 'https://www.el-ideal-ideas.com'
-    app.config["API_LICENSE_NAME"] = "MIT"
-    app.config["API_HOST"] = moca_config.get('config_server_host',
-                                             str,
-                                             default='127.0.0.1') + ':' + moca_config.get('config_server_port',
-                                                                                          int,
-                                                                                          default=port)
-    if ssl is not None:
-        app.config["API_SCHEMES"] = ["https"]
-    else:
-        app.config["API_SCHEMES"] = ["http"]
-
-    # -- Route --------------------------------------------------------------------------
-
-    @doc.tag('Redirect')
-    @doc.summary('redirect to swagger document')
-    @doc.description("""
-        <pre>
-        EN: redirect to /swagger
-        JA: /swagger にリダイレクトします。
-        ZH: 跳转到 /swagger
-        </pre>
-    """)
-    async def redirect_to_swagger_route(request):
-        """Redirect to swagger"""
-        return redirect('/swagger')
-
-    @doc.tag('Config')
-    @doc.summary('set config')
-    @doc.consumes(doc.JsonBody(
-        {
-            'key': doc.String(name='key', description='the config name', required=True),
-            'value': doc.String(name='value', description="the config value(not only string)", required=True),
-            'token': doc.String(name='token', description='server access token', required=True),
-        }
-    ), location='body', required=True)
-    @doc.description("""
-    <pre>
-        EN: set a config, if already exists, overwrite it.
-        JA: 設定を追加します。すでに存在している場合は上書きします。
-        ZH: 添加设定。如果设定已经存在，覆盖原有设定。
-    </pre>
-    """)
-    @doc.response(200, 'Success', description='Success')
-    @doc.response(403, 'Access denied', description='Access denied')
-    @doc.response(400, 'Missing required parameters', description='Missing required parameters')
-    async def set_route_with_post_method(request):
-        """Set config route"""
-        try:
-            key = request.json['key']
-            value = request.json['value']
-            token = request.json['token']
-            if moca_config.check('config_server_token', str, token):
-                moca_config.set(key, value)
-                return text('Success', headers=server_headers)
-            else:
-                raise Forbidden('Access denied')
-        except KeyError:
-            raise InvalidUsage('Missing required parameters')
-
-    @doc.tag('Config')
-    @doc.summary('set config')
-    @doc.consumes(doc.String(name='key', description='the config name', required=True),
-                  location='query', required=True)
-    @doc.consumes(doc.String(name='value', description='the config value', required=True),
-                  location='query', required=True)
-    @doc.consumes(doc.String(name='token', description='server access token', required=True),
-                  location='query', required=True)
-    @doc.description("""
-    <pre>
-        EN: set a config, if already exists, overwrite it.
-        JA: 設定を追加します。すでに存在している場合は上書きします。
-        ZH: 添加设定。如果设定已经存在，覆盖原有设定。
-    </pre>
-    """)
-    @doc.response(200, 'Success', description='Success')
-    @doc.response(403, 'Access denied', description='Access denied')
-    @doc.response(400, 'Missing required parameters', description='Missing required parameters')
-    async def set_route_with_get_method(request):
-        """Set config route"""
-        key = request.args.get('key')
-        value = request.args.get('value')
-        token = request.args.get('token')
-        if token is not None and key is not None and value is not None:
-            if moca_config.check('config_server_token', str, token):
-                moca_config.set(key, value)
-                return text('Success', headers=server_headers)
-            else:
-                raise Forbidden('Access denied')
-        else:
-            raise InvalidUsage('Missing required parameters')
-
-    @doc.tag('Config')
-    @doc.summary('get config')
-    @doc.consumes(doc.String(name='key', description='the config name', required=True),
-                  location='query', required=True)
-    @doc.consumes(doc.String(name='token', description='server access token', required=True),
-                  location='query', required=True)
-    @doc.description("""
-    <pre>
-        EN: get the config value. if can't found it, return null.
-            if key is "[el]#moca_get_all_config#" system will return all config value.
-        JA: 設定情報を取得します。情報が存在しない場合はnullを返します。
-            keyの値が"[el]#moca_get_all_config#"である場合はすべての設定の値を返します。
-        ZH: 获取设定信息。如果设定不存在返回null。
-            如果key的值是"[el]#moca_get_all_config#"系统会返回所有设定信息。
-    </pre>
-    """)
-    @doc.response(200, 'config value (JSON type)', description='Success')
-    @doc.response(403, 'Access denied', description='Access denied')
-    @doc.response(400, 'Missing required parameters', description='Missing required parameters')
-    async def get_route_with_get_method(request):
-        """Get config route"""
-        key = request.args.get('key')
-        token = request.args.get('token')
-        if key is not None and token is not None:
-            if moca_config.check('config_server_token', str, token):
-                if key == MocaConfig.GET_ALL_CONFIG:
-                    return json(moca_config.get_all_config(), headers=server_headers)
-                else:
-                    return json(moca_config.get(key, any, default=None), headers=server_headers)
-            else:
-                raise Forbidden('Access denied')
-        else:
-            raise InvalidUsage('Missing required parameters')
-
-    @doc.tag('Config')
-    @doc.summary('get config')
-    @doc.consumes(doc.JsonBody(
-        {
-            'key': doc.String(name='key', description='the config name', required=True),
-            'token': doc.String(name='token', description='server access token', required=True),
-        }
-    ), location='body', required=True)
-    @doc.description("""
-    <pre>
-        EN: get the config value. if can't found it, return null.
-            if key is "[el]#moca_get_all_config#" system will return all config value.
-        JA: 設定情報を取得します。情報が存在しない場合はnullを返します。
-            keyの値が"[el]#moca_get_all_config#"である場合はすべての設定の値を返します。
-        ZH: 获取设定信息。如果设定不存在返回null。
-            如果key的值是"[el]#moca_get_all_config#"系统会返回所有设定信息。
-    </pre>
-    """)
-    @doc.response(200, 'config value (JSON type)', description='Success')
-    @doc.response(403, 'Access denied', description='Access denied')
-    @doc.response(400, 'Missing required parameters', description='Missing required parameters')
-    async def get_route_with_post_method(request):
-        """Get config route"""
-        try:
-            key = request.json['key']
-            token = request.json['token']
-            if moca_config.check('config_server_token', str, token):
-                if key == MocaConfig.GET_ALL_CONFIG:
-                    return json(moca_config.get_all_config(), headers=server_headers)
-                else:
-                    return json(moca_config.get(key, any, default=None), headers=server_headers)
-            else:
-                raise Forbidden('Access denied')
-        except KeyError:
-            raise InvalidUsage('Missing required parameters')
-
-    @doc.tag('Config')
-    @doc.summary('check config')
-    @doc.consumes(doc.String(name='key', description='the config name', required=True),
-                  location='query', required=True)
-    @doc.consumes(doc.String(name='value', description='the config value', required=True),
-                  location='query', required=True)
-    @doc.consumes(doc.String(name='token', description='server access token', required=True),
-                  location='query', required=True)
-    @doc.description("""
-    <pre>
-        EN: check the config value. return True or False.
-        JA: 設定情報をチェックして真偽値を返します。
-        ZH: 获取设定信息并且返回布尔值。
-    </pre>
-    """)
-    @doc.response(200, 'status "true" or "false"', description='Success')
-    @doc.response(403, 'Access denied', description='Access denied')
-    @doc.response(400, 'Missing required parameters', description='Missing required parameters')
-    async def check_route_with_get_method(request):
-        """Check config route"""
-        key = request.args.get('key')
-        value = request.args.get('value')
-        token = request.args.get('token')
-        if key is not None and value is not None and token is not None:
-            if moca_config.check('config_server_token', str, token):
-                return json(moca_config.check(key, any, value), headers=server_headers)
-            else:
-                raise Forbidden('Access denied')
-        else:
-            raise InvalidUsage('Missing required parameters')
-
-    @doc.tag('Config')
-    @doc.summary('check config')
-    @doc.consumes(doc.JsonBody(
-        {
-            'key': doc.String(name='key', description='the config name', required=True),
-            'value': doc.String(name='value', description="the config value(not only string)", required=True),
-            'token': doc.String(name='token', description='server access token', required=True),
-        }
-    ), location='body', required=True)
-    @doc.description("""
-    <pre>
-        EN: check the config value. return True or False.
-        JA: 設定情報をチェックして真偽値を返します。
-        ZH: 获取设定信息并且返回布尔值。
-    </pre>
-    """)
-    @doc.response(200, 'status "true" or "false"', description='Success')
-    @doc.response(403, 'Access denied', description='Access denied')
-    @doc.response(400, 'Missing required parameters', description='Missing required parameters')
-    async def check_route_with_post_method(request):
-        """Check config route"""
-        try:
-            key = request.json['key']
-            value = request.json['value']
-            token = request.json['token']
-            if moca_config.check('config_server_token', str, token):
-                return json(moca_config.check(key, any, value), headers=server_headers)
-            else:
-                raise Forbidden('Access denied')
-        except KeyError:
-            raise InvalidUsage('Missing required parameters')
-
-    # -------------------------------------------------------------------------- Route --
-
-    # -------------------------------------------------------------------------- Set Listener --
-
-    @app.listener('after_server_stop')
-    async def after_server_stop(sanic_app, loop):
-        """Sanic Listener"""
-        _exit(0)
-
-    # -------------------------------------------------------------------------- Set Listener --
-
-    # add documentation redirect route
-    app.blueprint(swagger_blueprint)
-    app.add_route(redirect_to_swagger_route, '/doc', methods={'GET'})
-    app.add_route(redirect_to_swagger_route, '/documentation', methods={'GET'})
-    # add routes
-    app.add_route(set_route_with_get_method, '/set', methods={'GET'})
-    app.add_route(set_route_with_post_method, '/set', methods={'POST', 'OPTIONS'})
-    app.add_route(get_route_with_get_method, '/get', methods={'GET'})
-    app.add_route(get_route_with_post_method, '/get', methods={'POST', 'OPTIONS'})
-    app.add_route(check_route_with_get_method, '/check', methods={'GET'})
-    app.add_route(check_route_with_post_method, '/check', methods={'POST', 'OPTIONS'})
-    # run server
-    app.run('0.0.0.0',
-            port=port,
-            debug=False,
-            ssl=ssl,
-            workers=workers,
-            access_log=False)
-
-
-# -------------------------------------------------------------------------- Public Functions --
-
-# -- Run As Main --------------------------------------------------------------------------
-
-def main():
-    args = docopt(__USAGE)
-    if args.get('help'):
-        print(__HELP)
-    elif args.get('PATH') is not None:
-        try:
-            config_server_name = args.get('--name')[0]
-        except IndexError:
-            config_server_name = 'Unknown'
-        try:
-            server_port = args.get('--port')[0]
-        except IndexError:
-            server_port = 5800
-        try:
-            server_token = args.get('--token')[0]
-        except IndexError:
-            server_token = 'mochimochi'
-        try:
-            worker_number = int(args.get('--worker')[0])
-        except (IndexError, TypeError, ValueError):
-            worker_number = 1
-        try:
-            interval = float(args.get('--interval')[0])
-        except (IndexError, TypeError, ValueError):
-            interval = 5.0
-        ssl_context: Optional[SSLContext]
-        try:
-            cert_path = args.get('--certfile')[0]
-            key_path = args.get('--keyfile')[0]
-            ssl_context = create_default_context(Purpose.CLIENT_AUTH)
-            ssl_context.load_cert_chain(certfile=cert_path,
-                                        keyfile=key_path)
-        except IndexError:
-            ssl_context = None
-        try:
-            run_server(config_name=config_server_name,
-                       port=server_port,
-                       filepath=args.get('PATH'),
-                       reload_interval=interval,
-                       ssl=ssl_context,
-                       workers=worker_number,
-                       server_access_token=server_token)
-        except (ValueError, TypeError):
-            print('-- ValueError or TypeError ------------------------------------------------------------------------')
-            print("EN: Can't create the instance of the MocaConfig class, Please check your arguments.")
-            print("JA: MocaConfigクラスのインスタントを作成できませんでした。コマンドの引数を確認してください。")
-            print("ZH: 无法生成MocaConfig类的实例，请再次确认指令参数。")
-            print('------------------------------------------------------------------------ ValueError or TypeError --')
-        except MocaFileError:
-            print('-- MocaFileError ------------------------------------------------------------------------')
-            print("EN: Can't use this config file. Please check the file path and the file permissions.")
-            print("JA: 指定されて設定ファイルが使用できません。ファイルパスとファイル権限を確認してください。")
-            print("ZH: 您指定的设定文件无法使用，请再次确认文件地址和文件权限。")
-            print('------------------------------------------------------------------------ MocaFileError --')
-    else:
-        print(EL_S)
-        sleep(1)
-        print("""
-        ----------------------------------------------------------------------------
-        ----------------------------------------------------------------------------
-        This is the config module developed by el.ideal-ideas for Moca System.
-        This config module is json based.
-        All config data in the json file, will be loaded into memory, and can be used from MocaConfig class.
-        MocaConfig class will reload the json file in 5(default value) seconds.
-        If the json file was changed. the new config value will overwrite the old config value that in memory.
-        -------
-        これはモカシステムのためにel.ideal-ideasによって開発された設定モジュールである。
-        この設定モジュールはJSON形式を採用しています。
-        JSONファイル内のすべての設定情報はメモリ内にロードされ、そしてMocaConfigクラスを経由して取得できます。
-        MocaConfigクラスはデフォルト設定では5秒ごとJSONファイルをリロードします。
-        JSONファイルに変更があった場合、その変更はメモリ内の設定情報にも反映されます。
-        -------
-        这是el.ideal-ideas为茉客系统开发的设定模块。
-        这个设定模块采用了JSON格式。
-        JSON文件内的所有设定信息会被保存到内存里，您可以通过MocaConfig类来获取各种设定信息。
-        MocaConfig类会每5（初期值）秒重新读取一次JSON文件。
-        如果JSON文件被改写，内存内的设定信息也会和JSON文件同步。
-        ----------------------------------------------------------------------------
-        ----------------------------------------------------------------------------
-        """)
-        sleep(1)
-        print(__USAGE)
-
-
-if __name__ == '__main__':
-    main()
-
-# -------------------------------------------------------------------------- Run As Main --

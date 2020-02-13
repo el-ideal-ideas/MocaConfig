@@ -31,17 +31,11 @@ setup(
     description='An JSON based config manager.',
     long_description=long_description,
     long_description_content_type='text/markdown',
-    entry_points={
-        'console_scripts': [
-            'moca_config=moca_config.MocaConfig:main'
-        ]
-    },
     keywords='Moca, MocaConfig, config, json, JSON',
     classifiers=[
         'Development Status :: 5 - Production/Stable',
         'License :: OSI Approved :: MIT License',
         'Programming Language :: Python',
-        'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
         'Natural Language :: English',
