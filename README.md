@@ -4,7 +4,7 @@
 
 # Installation
 ```
-pip install moca_config==1.2.1
+pip install moca_config==1.3.0
 or
 pip install moca_config
 ```
@@ -342,6 +342,16 @@ def remove_config(key: str, access_token: str = '', root_pass: str = '') -> Opti
     - Delete config file.
     - 設定ファイルを削除します。
     - 删除设定文件。
+    
+- def set_and_encrypt(key: str, value: Any, encrypt_pass: str, access_token: str = '', root_pass: str = '') -> Optional[bool]:
+    - Similar to the set method, but this method encrypt the data in config file.
+    - set メソッドとほぼ同じ機能だが、設定ファイルないのデータを暗号化します。
+    - 和set方法几乎相同，但是会对设定文件内部的数据加密。
+    
+- def get_encrypted_config(key: str, encrypt_pass: str, res_type: Any = any, default: Any = None, auto_convert: bool = False, allow_el_command: bool = False, save_unknown_config: bool = True, access_token: str = '', root_pass: str = '') -> Any:
+    - Similar to the get method, but this method can get encrypted config.
+    - get メソッドとほぼ同じ機能だが、暗号化された設定も取得可能。
+    - 和get方法几乎相同，但是可以读取被加密的数据。
 
 ###### Optional Methods
     

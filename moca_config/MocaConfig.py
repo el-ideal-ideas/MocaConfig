@@ -33,21 +33,22 @@ https://www.el-ideal-ideas.com
 # -- Imports --------------------------------------------------------------------------
 
 from typing import Any, Union, List, Tuple, Optional
-from moca_core import N, MocaFileError, run_on_other_thread, MOCHI_MOCHI
+from moca_core import N, MocaFileError, run_on_other_thread, MOCHI_MOCHI, encrypt, decrypt
 from pathlib import Path
-from json import load, dump, JSONDecodeError
+from json import load, dump, JSONDecodeError, dumps, loads
 from time import sleep
 from datetime import datetime
 from random import choice, randint
 from string import ascii_letters, digits
 from uuid import uuid1, uuid4
 from multiprocessing import current_process, cpu_count
+from base64 import b64encode, b64decode
 
 # -------------------------------------------------------------------------- Imports --
 
 # -- Variables --------------------------------------------------------------------------
 
-VERSION = '1.2.1'
+VERSION = '1.3.0'
 
 # -------------------------------------------------------------------------- Variables --
 
@@ -197,6 +198,8 @@ class MocaConfig(object):
         MocaConfig.__instance_list[name] = self
         # write access token
         self.set('__moca_config_access_token__', access_token, root_pass=MocaConfig.__ROOT_PASS)
+        # write name
+        self.set('__config_instance_name__', name, root_pass=MocaConfig.__ROOT_PASS)
 
     # ----------------------------------------------------------------------------
     # ----------------------------------------------------------------------------
@@ -405,14 +408,14 @@ class MocaConfig(object):
         :return: if can't access to the config file, return None
         """
         if self.is_private():
-            if (MocaConfig.__ROOT_PASS == root_pass) or bool(self.check_access_token(MocaConfig.__ROOT_PASS,
-                                                                                     access_token)):
+            if (MocaConfig.__ROOT_PASS == root_pass) or bool(self.check_access_token(access_token,
+                                                                                     MocaConfig.__ROOT_PASS)):
                 return self.__config_cache
             else:
                 return None
         else:
-            if (MocaConfig.__ROOT_PASS == root_pass) or bool(self.check_access_token(MocaConfig.__ROOT_PASS,
-                                                                                     access_token)):
+            if (MocaConfig.__ROOT_PASS == root_pass) or bool(self.check_access_token(access_token,
+                                                                                     MocaConfig.__ROOT_PASS)):
                 return self.__config_cache
             else:
                 return {key: value for key, value in self.__config_cache.items() if not key.startswith('_')}
@@ -431,14 +434,14 @@ class MocaConfig(object):
         :return: if can't access to the config file, return None
         """
         if self.is_private():
-            if (MocaConfig.__ROOT_PASS == root_pass) or bool(self.check_access_token(MocaConfig.__ROOT_PASS,
-                                                                                     access_token)):
+            if (MocaConfig.__ROOT_PASS == root_pass) or bool(self.check_access_token(access_token,
+                                                                                     MocaConfig.__ROOT_PASS)):
                 return tuple(self.__config_cache.keys())
             else:
                 return None
         else:
-            if (MocaConfig.__ROOT_PASS == root_pass) or bool(self.check_access_token(MocaConfig.__ROOT_PASS,
-                                                                                     access_token)):
+            if (MocaConfig.__ROOT_PASS == root_pass) or bool(self.check_access_token(access_token,
+                                                                                     MocaConfig.__ROOT_PASS)):
                 return tuple(self.__config_cache.keys())
             else:
                 return tuple([key for key in self.__config_cache.keys() if not key.startswith('_')])
@@ -524,15 +527,15 @@ class MocaConfig(object):
         """
         allow: bool
         if self.is_private():
-            if (MocaConfig.__ROOT_PASS == root_pass) or bool(self.check_access_token(MocaConfig.__ROOT_PASS,
-                                                                                     access_token)):
+            if (MocaConfig.__ROOT_PASS == root_pass) or bool(self.check_access_token(access_token,
+                                                                                     MocaConfig.__ROOT_PASS)):
                 allow = True
             else:
                 allow = False
         else:
             if key.startswith('_'):
-                if (MocaConfig.__ROOT_PASS == root_pass) or bool(self.check_access_token(MocaConfig.__ROOT_PASS,
-                                                                                         access_token)):
+                if (MocaConfig.__ROOT_PASS == root_pass) or bool(self.check_access_token(access_token,
+                                                                                         MocaConfig.__ROOT_PASS)):
                     allow = True
                 else:
                     allow = False
@@ -643,15 +646,15 @@ class MocaConfig(object):
         """
         allow: bool
         if self.is_private():
-            if (MocaConfig.__ROOT_PASS == root_pass) or bool(self.check_access_token(MocaConfig.__ROOT_PASS,
-                                                                                     access_token)):
+            if (MocaConfig.__ROOT_PASS == root_pass) or bool(self.check_access_token(access_token,
+                                                                                     MocaConfig.__ROOT_PASS)):
                 allow = True
             else:
                 allow = False
         else:
             if key.startswith('_'):
-                if (MocaConfig.__ROOT_PASS == root_pass) or bool(self.check_access_token(MocaConfig.__ROOT_PASS,
-                                                                                         access_token)):
+                if (MocaConfig.__ROOT_PASS == root_pass) or bool(self.check_access_token(access_token,
+                                                                                         MocaConfig.__ROOT_PASS)):
                     allow = True
                 else:
                     allow = False
@@ -685,7 +688,8 @@ class MocaConfig(object):
         :param root_pass: the root password.
         :return: status, [success] or [failed]. If can't access to this config file. return None.
         """
-        if (MocaConfig.__ROOT_PASS == root_pass) or bool(self.check_access_token(MocaConfig.__ROOT_PASS, access_token)):
+        if (MocaConfig.__ROOT_PASS == root_pass) or bool(self.check_access_token(access_token,
+                                                                                 MocaConfig.__ROOT_PASS)):
             try:
                 value = self.__config_cache[key]
                 del self.__config_cache[key]
@@ -720,15 +724,15 @@ class MocaConfig(object):
         """
         status = self.get(key, res_type, allow_el_command=False) == value
         if self.is_private():
-            if (MocaConfig.__ROOT_PASS == root_pass) or bool(self.check_access_token(MocaConfig.__ROOT_PASS,
-                                                                                     access_token)):
+            if (MocaConfig.__ROOT_PASS == root_pass) or bool(self.check_access_token(access_token,
+                                                                                     MocaConfig.__ROOT_PASS)):
                 return status
             else:
                 return None
         else:
             if key.startswith('_'):
-                if (MocaConfig.__ROOT_PASS == root_pass) or bool(self.check_access_token(MocaConfig.__ROOT_PASS,
-                                                                                         access_token)):
+                if (MocaConfig.__ROOT_PASS == root_pass) or bool(self.check_access_token(access_token,
+                                                                                         MocaConfig.__ROOT_PASS)):
                     return status
                 else:
                     return None
@@ -776,39 +780,47 @@ class MocaConfig(object):
 
     def is_private(self) -> bool:
         """Check is config private"""
-        return self.get('__private__', bool, default=True, root_pass=MocaConfig.__ROOT_PASS)
+        try:
+            return bool(self.__config_cache['__private__'])
+        except (TypeError, ValueError, Exception):
+            return True
 
     # ----------------------------------------------------------------------------
     # ----------------------------------------------------------------------------
 
     def set_access_token(self,
-                         root_pass: str,
-                         token: str = '') -> Optional[bool]:
+                         token: str,
+                         root_pass: str = '') -> Optional[bool]:
         """
         Set a access token for config file.
         :param root_pass: the root password.
-        :param token: the access token of config file. if the value is empty string, use a random token.
+        :param token: the access token of config file.
         :return status, [success] or [failed]. If can't access to this config file. return None.
         """
-        if token == '':
-            access_token = self.random_string(64)
-        else:
-            access_token = token
-        return self.set('__moca_config_access_token__', access_token, root_pass=root_pass)
+        return self.set('__moca_config_access_token__', token, root_pass=root_pass)
 
     # ----------------------------------------------------------------------------
     # ----------------------------------------------------------------------------
 
     def check_access_token(self,
-                           root_pass: str,
-                           token: str) -> Optional[bool]:
+                           token: str,
+                           root_pass: str = '') -> Optional[bool]:
         """
         Check is the access token of config file correct.
-        :param root_pass: the root password.
         :param token: config file access token.
-        :return: status, [correct] or [incorrect]. If can't access to this config file. return None.'
+        :param root_pass: the root password.
+        :return: status, [correct] or [incorrect].
+        If can't access to this config file. return None.
+        If root password is incorrect return None.
+        If some other error occurred return None.
         """
-        return self.check('__moca_config_access_token__', str, token, root_pass=root_pass)
+        try:
+            if MocaConfig.__ROOT_PASS == root_pass:
+                return self.__config_cache['__moca_config_access_token__'] == token
+            else:
+                return None
+        except IndexError:
+            return None
 
     # ----------------------------------------------------------------------------
     # ----------------------------------------------------------------------------
@@ -822,8 +834,8 @@ class MocaConfig(object):
         :param root_pass: the root password.
         :return: status, [success] or [failed]
         """
-        if (MocaConfig.__ROOT_PASS == root_pass) or bool(self.check_access_token(MocaConfig.__ROOT_PASS,
-                                                                                 access_token)):
+        if (MocaConfig.__ROOT_PASS == root_pass) or bool(self.check_access_token(access_token,
+                                                                                 MocaConfig.__ROOT_PASS)):
             try:
                 self.__path.unlink()
                 return True
@@ -847,5 +859,75 @@ class MocaConfig(object):
     def print_mochi() -> None:
         """♫ヽ(゜∇゜ヽ)♪"""
         print(MocaConfig.mochi())
+
+    # ----------------------------------------------------------------------------
+    # ----------------------------------------------------------------------------
+
+    def set_and_encrypt(self,
+                        key: str,
+                        value: Any,
+                        encrypt_pass: str,
+                        access_token: str = '',
+                        root_pass: str = '') -> Optional[bool]:
+        """
+        set a config value and encrypt it in the config file.
+        if the key already exists, overwrite it.
+        :param key: the config name.
+        :param value: the config value.
+        :param encrypt_pass: the password to decrypt the config.
+        :param access_token: the access token of config file.
+        :param root_pass: the root password.
+        :return: status, [success] or [failed], If can't access to the config file return None
+        """
+        json_string = dumps(value)
+        encrypted_value = encrypt(json_string.encode('utf-8'), password=encrypt_pass)
+        encrypted_string = b64encode(encrypted_value).decode('utf-8')
+        return self.set(key, encrypted_string, access_token=access_token, root_pass=root_pass)
+
+    # ----------------------------------------------------------------------------
+    # ----------------------------------------------------------------------------
+
+    def get_encrypted_config(self,
+                             key: str,
+                             encrypt_pass: str,
+                             res_type: Any = any,
+                             default: Any = None,
+                             auto_convert: bool = False,
+                             allow_el_command: bool = False,
+                             save_unknown_config: bool = True,
+                             access_token: str = '',
+                             root_pass: str = '') -> Any:
+        """
+        return the config value.
+        :param key: the config name.
+        :param encrypt_pass: the password to decrypt the config.
+        :param res_type: the response type you want to get. if the value is <any>, don't check the response type.
+        :param default: if can't found the config value, return default value.
+        :param auto_convert: if the response type is incorrect, try convert the value.
+        :param allow_el_command: use el command.
+        :param save_unknown_config: save the config value with default value when can't found the config value.
+        :param access_token: the access token of config file.
+        :param root_pass: the root password.
+        :return: config value. if can't found the config value, return default value.
+                 if the response type is incorrect and can't convert the value, return default value.
+                 if can't access to the config file, return default value.
+        """
+        moca_null = '[el]#moca_null#'
+        encrypted_string = self.get(key,
+                                    res_type,
+                                    moca_null,
+                                    auto_convert,
+                                    allow_el_command,
+                                    save_unknown_config,
+                                    access_token, root_pass)
+        if encrypted_string == moca_null:
+            return default
+        else:
+            encrypted_value = b64decode(encrypted_string.encode('utf-8'))
+            plain_value = decrypt(encrypted_value, encrypt_pass).decode()
+            try:
+                return loads(plain_value)
+            except JSONDecodeError:
+                return default
 
 # -------------------------------------------------------------------------- Main Class --
