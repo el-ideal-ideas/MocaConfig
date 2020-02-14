@@ -48,7 +48,7 @@ from base64 import b64encode, b64decode
 
 # -- Variables --------------------------------------------------------------------------
 
-VERSION = '1.3.0'
+VERSION = '1.3.1'
 
 # -------------------------------------------------------------------------- Variables --
 
@@ -200,6 +200,8 @@ class MocaConfig(object):
         self.set('__moca_config_access_token__', access_token, root_pass=MocaConfig.__ROOT_PASS)
         # write name
         self.set('__config_instance_name__', name, root_pass=MocaConfig.__ROOT_PASS)
+        # write version
+        self.set('__MocaConfig_version__', VERSION, root_pass=MocaConfig.__ROOT_PASS)
 
     # ----------------------------------------------------------------------------
     # ----------------------------------------------------------------------------
