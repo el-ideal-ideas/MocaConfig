@@ -48,7 +48,7 @@ from base64 import b64encode, b64decode
 
 # -- Variables --------------------------------------------------------------------------
 
-VERSION = '1.4.0'
+VERSION = '1.4.2'
 
 # -------------------------------------------------------------------------- Variables --
 
@@ -965,17 +965,17 @@ class MocaConfig(object):
 
     def add_handler(self,
                     name: str,
+                    keys: Union[List[str], str],
                     handler: Callable,
-                    args: Tuple,
-                    kwargs: Dict,
-                    keys: Union[List[str], str]) -> None:
+                    args: Tuple = (),
+                    kwargs: Dict = {}) -> None:
         """
         Add a handler to do something when the config value was changed.
         :param name: the name of this handler. if same name is already exists, overwrite it.
+        :param keys: the keys of the config.
         :param handler: the handler function.  arguments(the_updated_key, old_value, new_value, *args, **kwargs)
         :param args: arguments to the handler.
         :param kwargs: keyword arguments to the handler.
-        :param keys: the keys of the config.
         :return: None
         """
         self.__handler[name] = [keys, handler, args, kwargs]
@@ -1029,11 +1029,14 @@ class MocaConfig(object):
             try:
                 if old_cache[key] != new_cache[key]:
                     for name in self.__handled_keys[key]:
-                        self.__handler[name][1](key,
-                                                old_cache[key],
-                                                new_cache[key],
-                                                *self.__handler[name][2],
-                                                **self.__handler[name][3])
+                        try:
+                            self.__handler[name][1](key,
+                                                    old_cache[key],
+                                                    new_cache[key],
+                                                    *self.__handler[name][2],
+                                                    **self.__handler[name][3])
+                        except Exception:
+                            pass
             except KeyError:
                 pass
 
@@ -1047,11 +1050,14 @@ class MocaConfig(object):
         """Run the handlers if needed."""
         try:
             for name in self.__handled_keys[key]:
-                self.__handler[name][1](key,
-                                        old_value,
-                                        new_value,
-                                        *self.__handler[name][2],
-                                        **self.__handler[name][3])
+                try:
+                    self.__handler[name][1](key,
+                                            old_value,
+                                            new_value,
+                                            *self.__handler[name][2],
+                                            **self.__handler[name][3])
+                except Exception:
+                    pass
         except KeyError:
             pass
 
