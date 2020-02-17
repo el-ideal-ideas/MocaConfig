@@ -48,7 +48,7 @@ from base64 import b64encode, b64decode
 
 # -- Variables --------------------------------------------------------------------------
 
-VERSION = '1.4.3'
+VERSION = '1.4.4'
 
 # -------------------------------------------------------------------------- Variables --
 
@@ -163,6 +163,10 @@ class MocaConfig(object):
             TypeError: if the arguments type is incorrect.
             MocaFileError: if can't find, open or create config file.
         """
+        # initialize handlers dictionary
+        self.__handler: Dict[str, List] = {}
+        # initialize handled keys list
+        self.__handled_keys: Dict[str, List[str]] = {}
         #############################
         if kwargs.get('mochi', False):
             MocaConfig.__INIT_MSG['__mochi__'] = 'もっちもっちにゃんにゃん'
@@ -202,10 +206,6 @@ class MocaConfig(object):
         run_on_other_thread(self.__reload_config_loop)
         # add self to instance list
         MocaConfig.__instance_list[name] = self
-        # initialize handlers dictionary
-        self.__handler: Dict[str, List] = {}
-        # initialize handled keys list
-        self.__handled_keys: Dict[str, List[str]] = {}
         # write access token
         self.set('__moca_config_access_token__', access_token, root_pass=MocaConfig.__ROOT_PASS)
         # write name
@@ -361,6 +361,8 @@ class MocaConfig(object):
         except OSError:
             self.__status = MocaConfig.OS_ERROR
         except Exception:
+            from traceback import print_exc
+            print_exc()
             self.__status = MocaConfig.UNKNOWN_ERROR
 
     # ----------------------------------------------------------------------------
