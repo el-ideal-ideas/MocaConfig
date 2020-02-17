@@ -43,12 +43,13 @@ from string import ascii_letters, digits
 from uuid import uuid1, uuid4
 from multiprocessing import current_process, cpu_count
 from base64 import b64encode, b64decode
+from traceback import print_exc
 
 # -------------------------------------------------------------------------- Imports --
 
 # -- Variables --------------------------------------------------------------------------
 
-VERSION = '1.4.4'
+VERSION = '1.4.5'
 
 # -------------------------------------------------------------------------- Variables --
 
@@ -1042,7 +1043,7 @@ class MocaConfig(object):
                                                     *self.__handler[name][2],
                                                     **self.__handler[name][3])
                         except Exception:
-                            pass
+                            print_exc()
             except KeyError:
                 pass
 
@@ -1063,7 +1064,7 @@ class MocaConfig(object):
                                             *self.__handler[name][2],
                                             **self.__handler[name][3])
                 except Exception:
-                    pass
+                    print_exc()
         except KeyError:
             pass
 
