@@ -48,7 +48,7 @@ from base64 import b64encode, b64decode
 
 # -- Variables --------------------------------------------------------------------------
 
-VERSION = '1.4.2'
+VERSION = '1.4.3'
 
 # -------------------------------------------------------------------------- Variables --
 
@@ -202,16 +202,16 @@ class MocaConfig(object):
         run_on_other_thread(self.__reload_config_loop)
         # add self to instance list
         MocaConfig.__instance_list[name] = self
+        # initialize handlers dictionary
+        self.__handler: Dict[str, List] = {}
+        # initialize handled keys list
+        self.__handled_keys: Dict[str, List[str]] = {}
         # write access token
         self.set('__moca_config_access_token__', access_token, root_pass=MocaConfig.__ROOT_PASS)
         # write name
         self.set('__config_instance_name__', name, root_pass=MocaConfig.__ROOT_PASS)
         # write version
         self.set('__MocaConfig_version__', VERSION, root_pass=MocaConfig.__ROOT_PASS)
-        # initialize handlers dictionary
-        self.__handler: Dict[str, List] = {}
-        # initialize handled keys list
-        self.__handled_keys: Dict[str, List[str]] = {}
 
     # ----------------------------------------------------------------------------
     # ----------------------------------------------------------------------------
@@ -348,8 +348,9 @@ class MocaConfig(object):
         try:
             with open(str(self.path), mode='r', encoding='utf-8') as config_file:
                 new_cache = load(config_file)
-                self.__run_handler_total(self.__config_cache, new_cache)
+                old_cache = self.__config_cache
                 self.__config_cache = new_cache
+                self.__run_handler_total(old_cache, new_cache)
             self.__status = MocaConfig.CORRECT
         except JSONDecodeError:
             self.__status = MocaConfig.DECODE_ERROR
@@ -473,43 +474,46 @@ class MocaConfig(object):
                  status: detected el-command, or not.
                  response: el-command response, if can't detect el-command, the response will be None.
         """
-        if command == cls.NOW:
-            return True, datetime.now()
-        elif command == cls.NOW_DATE:
-            return True, datetime.now().date()
-        elif command.startswith('[el]#moca_random_string<') and command.endswith('>#'):
-            try:
-                return True, cls.random_string(int(command[24:-2]))
-            except (TypeError, ValueError, Exception):
+        if isinstance(command, str):
+            if command == cls.NOW:
+                return True, datetime.now()
+            elif command == cls.NOW_DATE:
+                return True, datetime.now().date()
+            elif command.startswith('[el]#moca_random_string<') and command.endswith('>#'):
+                try:
+                    return True, cls.random_string(int(command[24:-2]))
+                except (TypeError, ValueError, Exception):
+                    return False, None
+            elif command == cls.RANDOM_INTEGER:
+                return True, randint(0, 9)
+            elif command.startswith('[el]#moca_random_integer_list<') and command.endswith('>#'):
+                try:
+                    return True, cls.random_integer_list(int(command[30:-2]))
+                except (TypeError, ValueError, Exception):
+                    return False, None
+            elif command.startswith('[el]#moca_random_integers<') and command.endswith('>#'):
+                try:
+                    return True, cls.random_integers(int(command[26:-2]))
+                except (TypeError, ValueError, Exception):
+                    return False, None
+            elif command == cls.UUID1:
+                return True, str(uuid1())
+            elif command == cls.UUID1_HEX:
+                return True, uuid1().hex
+            elif command == cls.UUID4:
+                return True, str(uuid4())
+            elif command == cls.UUID4_HEX:
+                return True, uuid4().hex
+            elif command == cls.PROCESS_ID:
+                return True, current_process().pid
+            elif command == cls.PROCESS_NAME:
+                return True, current_process().name
+            elif command == cls.CPU_COUNT:
+                return True, cpu_count()
+            elif command == cls.MOCHI:
+                return True, MOCHI_MOCHI
+            else:
                 return False, None
-        elif command == cls.RANDOM_INTEGER:
-            return True, randint(0, 9)
-        elif command.startswith('[el]#moca_random_integer_list<') and command.endswith('>#'):
-            try:
-                return True, cls.random_integer_list(int(command[30:-2]))
-            except (TypeError, ValueError, Exception):
-                return False, None
-        elif command.startswith('[el]#moca_random_integers<') and command.endswith('>#'):
-            try:
-                return True, cls.random_integers(int(command[26:-2]))
-            except (TypeError, ValueError, Exception):
-                return False, None
-        elif command == cls.UUID1:
-            return True, str(uuid1())
-        elif command == cls.UUID1_HEX:
-            return True, uuid1().hex
-        elif command == cls.UUID4:
-            return True, str(uuid4())
-        elif command == cls.UUID4_HEX:
-            return True, uuid4().hex
-        elif command == cls.PROCESS_ID:
-            return True, current_process().pid
-        elif command == cls.PROCESS_NAME:
-            return True, current_process().name
-        elif command == cls.CPU_COUNT:
-            return True, cpu_count()
-        elif command == cls.MOCHI:
-            return True, MOCHI_MOCHI
         else:
             return False, None
 

@@ -4,7 +4,7 @@
 
 # Installation
 ```
-pip install moca_config==1.4.2
+pip install moca_config==1.4.3
 or
 pip install moca_config
 ```
