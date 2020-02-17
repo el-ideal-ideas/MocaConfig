@@ -44,12 +44,13 @@ from uuid import uuid1, uuid4
 from multiprocessing import current_process, cpu_count
 from base64 import b64encode, b64decode
 from traceback import print_exc
+from os import stat
 
 # -------------------------------------------------------------------------- Imports --
 
 # -- Variables --------------------------------------------------------------------------
 
-VERSION = '1.4.5'
+VERSION = '1.5.1'
 
 # -------------------------------------------------------------------------- Variables --
 
@@ -62,7 +63,7 @@ class MocaConfig(object):
     This is the config module developed by el.ideal-ideas for Moca System.
     This config module is json based.
     All config data in the json file, will be loaded into memory, and can be used from MocaConfig class.
-    MocaConfig class will reload the json file in 5(default value) seconds.
+    MocaConfig class will reload the json file in 1(default value) seconds If it was changed.
     If the json file was changed. the new config value will overwrite the old config value that in memory.
     If the config file contains "__private__": True, the config file will be a private file.
     If the config key is starts with "_" , the config will be a private config.
@@ -72,7 +73,7 @@ class MocaConfig(object):
     これはモカシステムのためにel.ideal-ideasによって開発された設定モジュールである。
     この設定モジュールはJSON形式を採用しています。
     JSONファイル内のすべての設定情報はメモリ内にロードされ、そしてMocaConfigクラスを経由して取得できます。
-    MocaConfigクラスはデフォルト設定では5秒ごとJSONファイルをリロードします。
+    MocaConfigクラスはデフォルト設定では1秒ごとJSONファイルをリロードします(変更があった場合)。
     JSONファイルに変更があった場合、その変更はメモリ内の設定情報にも反映されます。
     設定ファイルが"__private__": True,を含む場合、その設定ファイルはプライベートな設定ファイルになります。
     "_"から始まる設定内容も同様にプライベートになります。
@@ -82,7 +83,7 @@ class MocaConfig(object):
     这是el.ideal-ideas为茉客系统开发的设定模块。
     这个设定模块采用了JSON格式。
     JSON文件内的所有设定信息会被保存到内存里，您可以通过MocaConfig类来获取各种设定信息。
-    MocaConfig类会每5（初期值）秒重新读取一次JSON文件。
+    MocaConfig类会每1（初期值）秒重新读取一次JSON文件（如果有变更）。
     如果JSON文件被改写，内存内的设定信息也会和JSON文件同步。
     如果设定文件包含"__private__": True,该设定文件则为隐私文件。
     如果设定key由"_"开始，该设定则为隐私设定。
@@ -107,6 +108,9 @@ class MocaConfig(object):
 
     __handled_keys: Dict[str, List[str]]
         the keys handled by handlers.
+
+    __timestamp: Optional[int]
+        the timestamp of the config file.
     """
 
     __INIT_MSG = {
@@ -148,7 +152,7 @@ class MocaConfig(object):
                  name: str,
                  filepath: Union[Path, str],
                  filename: str = '',
-                 reload_interval: float = 5.0,
+                 reload_interval: float = 1.0,
                  access_token: str = '',
                  **kwargs):
         """
@@ -164,6 +168,8 @@ class MocaConfig(object):
             TypeError: if the arguments type is incorrect.
             MocaFileError: if can't find, open or create config file.
         """
+        # initialize timestamp variable
+        self.__timestamp: Optional[float] = None
         # initialize handlers dictionary
         self.__handler: Dict[str, List] = {}
         # initialize handled keys list
@@ -347,11 +353,14 @@ class MocaConfig(object):
     def reload_config(self) -> None:
         """Reload json config file."""
         try:
-            with open(str(self.path), mode='r', encoding='utf-8') as config_file:
-                new_cache = load(config_file)
-                old_cache = self.__config_cache
-                self.__config_cache = new_cache
-                self.__run_handler_total(old_cache, new_cache)
+            time = stat(str(self.__path)).st_mtime
+            if (self.__timestamp is not None) and (time != self.__timestamp):
+                with open(str(self.__path), mode='r', encoding='utf-8') as config_file:
+                    new_cache = load(config_file)
+                    old_cache = self.__config_cache
+                    self.__config_cache = new_cache
+                    self.__run_handler_total(old_cache, new_cache)
+            self.__timestamp = time
             self.__status = MocaConfig.CORRECT
         except JSONDecodeError:
             self.__status = MocaConfig.DECODE_ERROR

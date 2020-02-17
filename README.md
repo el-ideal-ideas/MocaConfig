@@ -4,7 +4,7 @@
 
 # Installation
 ```
-pip install moca_config==1.4.5
+pip install moca_config==1.5.1
 or
 pip install moca_config
 ```
@@ -14,7 +14,7 @@ pip install moca_config
 This is the config module developed by el.ideal-ideas for Moca System.
 This config module is json based.
 All config data in the json file, will be loaded into memory, and can be used from MocaConfig class.
-MocaConfig class will reload the json file in 5(default value) seconds.
+MocaConfig class will reload the json file in 1(default value) seconds If it was changed.
 If the json file was changed. the new config value will overwrite the old config value that in memory.
 If the config file contains `"__private__": True,` the config file will be a private file.
 If the config key is starts with `"_"` , the config will be a private config.
@@ -25,7 +25,7 @@ If you want to access the private config, you should input the access token or t
 これはモカシステムのためにel.ideal-ideasによって開発された設定モジュールである。
 この設定モジュールはJSON形式を採用しています。
 JSONファイル内のすべての設定情報はメモリ内にロードされ、そしてMocaConfigクラスを経由して取得できます。
-MocaConfigクラスはデフォルト設定では5秒ごとJSONファイルをリロードします。
+MocaConfigクラスはデフォルト設定では1秒ごとJSONファイルをリロードします(変更があった場合)。
 JSONファイルに変更があった場合、その変更はメモリ内の設定情報にも反映されます。
 設定ファイルが`"__private__": True,`を含む場合、その設定ファイルはプライベートな設定ファイルになります。
 `"_"`から始まる設定内容も同様にプライベートになります。
@@ -36,7 +36,7 @@ JSONファイルに変更があった場合、その変更はメモリ内の設�
 这是el.ideal-ideas为茉客系统开发的设定模块。
 这个设定模块采用了JSON格式。
 JSON文件内的所有设定信息会被保存到内存里，您可以通过MocaConfig类来获取各种设定信息。
-MocaConfig类会每5（初期值）秒重新读取一次JSON文件。
+MocaConfig类会每1（初期值）秒重新读取一次JSON文件（如果有变更）。
 如果JSON文件被改写，内存内的设定信息也会和JSON文件同步。
 如果设定文件包含`"__private__": True,`该设定文件则为隐私文件。
 如果设定key由`"_"`开始，该设定则为隐私设定。
