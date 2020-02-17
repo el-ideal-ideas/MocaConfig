@@ -32,7 +32,7 @@ https://www.el-ideal-ideas.com
 
 # -- Imports --------------------------------------------------------------------------
 
-from typing import Any, Union, List, Tuple, Optional
+from typing import Any, Union, List, Tuple, Optional, Dict, Callable
 from moca_core import N, MocaFileError, run_on_other_thread, MOCHI_MOCHI, encrypt, decrypt
 from pathlib import Path
 from json import load, dump, JSONDecodeError, dumps, loads
@@ -48,7 +48,7 @@ from base64 import b64encode, b64decode
 
 # -- Variables --------------------------------------------------------------------------
 
-VERSION = '1.3.1'
+VERSION = '1.4.0'
 
 # -------------------------------------------------------------------------- Variables --
 
@@ -100,6 +100,12 @@ class MocaConfig(object):
 
     __status: int
         the status of config module, 0 is correct
+
+    __handler: Dict[str, List]
+        the handlers
+
+    __handled_keys: Dict[str, List[str]]
+        the keys handled by handlers.
     """
 
     __INIT_MSG = {
@@ -202,6 +208,10 @@ class MocaConfig(object):
         self.set('__config_instance_name__', name, root_pass=MocaConfig.__ROOT_PASS)
         # write version
         self.set('__MocaConfig_version__', VERSION, root_pass=MocaConfig.__ROOT_PASS)
+        # initialize handlers dictionary
+        self.__handler: Dict[str, List] = {}
+        # initialize handled keys list
+        self.__handled_keys: Dict[str, List[str]] = {}
 
     # ----------------------------------------------------------------------------
     # ----------------------------------------------------------------------------
@@ -337,7 +347,9 @@ class MocaConfig(object):
         """Reload json config file."""
         try:
             with open(str(self.path), mode='r', encoding='utf-8') as config_file:
-                self.__config_cache = load(config_file)
+                new_cache = load(config_file)
+                self.__run_handler_total(self.__config_cache, new_cache)
+                self.__config_cache = new_cache
             self.__status = MocaConfig.CORRECT
         except JSONDecodeError:
             self.__status = MocaConfig.DECODE_ERROR
@@ -635,6 +647,7 @@ class MocaConfig(object):
     def set(self,
             key: str,
             value: Any,
+            allow_el_command: bool = False,
             access_token: str = '',
             root_pass: str = '') -> Optional[bool]:
         """
@@ -642,6 +655,7 @@ class MocaConfig(object):
         if the key already exists, overwrite it.
         :param key: the config name.
         :param value: the config value.
+        :param allow_el_command: use el command.
         :param access_token: the access token of config file.
         :param root_pass: the root password.
         :return: status, [success] or [failed], If can't access to the config file return None
@@ -663,9 +677,23 @@ class MocaConfig(object):
             else:
                 allow = True
         if allow:
-            self.__config_cache[key] = value
+            if allow_el_command:
+                status, response = self.el_command_parser(value)
+                if status:
+                    new_value = response
+                else:
+                    new_value = value
+            else:
+                new_value = value
+            try:
+                old_value = self.__config_cache[key]
+            except KeyError:
+                old_value = None
+            self.__config_cache[key] = new_value
             res = self.__save_config_to_file()
             if res:
+                if old_value is not None:
+                    self.__run_handler_one(key, old_value, new_value)
                 return True
             else:
                 try:
@@ -931,5 +959,100 @@ class MocaConfig(object):
                 return loads(plain_value)
             except JSONDecodeError:
                 return default
+
+    # ----------------------------------------------------------------------------
+    # ----------------------------------------------------------------------------
+
+    def add_handler(self,
+                    name: str,
+                    handler: Callable,
+                    args: Tuple,
+                    kwargs: Dict,
+                    keys: Union[List[str], str]) -> None:
+        """
+        Add a handler to do something when the config value was changed.
+        :param name: the name of this handler. if same name is already exists, overwrite it.
+        :param handler: the handler function.  arguments(the_updated_key, old_value, new_value, *args, **kwargs)
+        :param args: arguments to the handler.
+        :param kwargs: keyword arguments to the handler.
+        :param keys: the keys of the config.
+        :return: None
+        """
+        self.__handler[name] = [keys, handler, args, kwargs]
+        if isinstance(keys, str):
+            try:
+                self.__handled_keys[keys].append(name)
+            except KeyError:
+                self.__handled_keys[keys] = [name, ]
+        else:
+            for key in keys:
+                try:
+                    self.__handled_keys[key].append(name)
+                except KeyError:
+                    self.__handled_keys[key] = [name, ]
+
+    # ----------------------------------------------------------------------------
+    # ----------------------------------------------------------------------------
+
+    def remove_handler(self,
+                       name: str) -> None:
+        """Remove the registered handler"""
+        try:
+            del self.__handler[name]
+            for key in self.__handled_keys:
+                try:
+                    self.__handled_keys[key].remove(name)
+                except ValueError:
+                    pass
+        except KeyError:
+            pass
+
+    # ----------------------------------------------------------------------------
+    # ----------------------------------------------------------------------------
+
+    def get_handler(self,
+                    name: str) -> Optional[Callable]:
+        """Get the registered handler"""
+        try:
+            return self.__handler[name][1]
+        except KeyError:
+            return None
+
+    # ----------------------------------------------------------------------------
+    # ----------------------------------------------------------------------------
+
+    def __run_handler_total(self,
+                            old_cache: dict,
+                            new_cache: dict) -> None:
+        """Run the handlers if needed."""
+        for key in self.__handled_keys:
+            try:
+                if old_cache[key] != new_cache[key]:
+                    for name in self.__handled_keys[key]:
+                        self.__handler[name][1](key,
+                                                old_cache[key],
+                                                new_cache[key],
+                                                *self.__handler[name][2],
+                                                **self.__handler[name][3])
+            except KeyError:
+                pass
+
+    # ----------------------------------------------------------------------------
+    # ----------------------------------------------------------------------------
+
+    def __run_handler_one(self,
+                          key: str,
+                          old_value: Any,
+                          new_value: Any) -> None:
+        """Run the handlers if needed."""
+        try:
+            for name in self.__handled_keys[key]:
+                self.__handler[name][1](key,
+                                        old_value,
+                                        new_value,
+                                        *self.__handler[name][2],
+                                        **self.__handler[name][3])
+        except KeyError:
+            pass
 
 # -------------------------------------------------------------------------- Main Class --

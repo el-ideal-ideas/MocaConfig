@@ -4,7 +4,7 @@
 
 # Installation
 ```
-pip install moca_config==1.3.0
+pip install moca_config==1.4.0
 or
 pip install moca_config
 ```
@@ -352,6 +352,21 @@ def remove_config(key: str, access_token: str = '', root_pass: str = '') -> Opti
     - Similar to the get method, but this method can get encrypted config.
     - get メソッドとほぼ同じ機能だが、暗号化された設定も取得可能。
     - 和get方法几乎相同，但是可以读取被加密的数据。
+    
+- def add_handler(name: str, handler: Callable, args: Tuple, kwargs: Dict, keys: Union[List[str], str]) -> None:
+    - Add a handler to run some action when the config was changed.
+    - 設定が変更されたときに呼び出されるハンドラーを設定できます。
+    - 可以添加一个在设定信息被更改是调用的函数。
+    
+def remove_handler(name: str) -> None:
+    - Remove the registered handler.
+    - 追加済みハンドラーを削除します。
+    - 删掉已添加的更改检测函数。
+    
+- def get_handler(name: str) -> Optional[Callable]:
+    - Get the registered handler.
+    - 追加済みハンドラーを取得します。
+    - 获取已添加的更改检测函数。
 
 ###### Optional Methods
     
