@@ -50,7 +50,7 @@ from os import stat
 
 # -- Variables --------------------------------------------------------------------------
 
-VERSION = '1.5.1'
+VERSION = '1.5.2'
 
 # -------------------------------------------------------------------------- Variables --
 
@@ -214,11 +214,11 @@ class MocaConfig(object):
         # add self to instance list
         MocaConfig.__instance_list[name] = self
         # write access token
-        self.set('__moca_config_access_token__', access_token, root_pass=MocaConfig.__ROOT_PASS)
-        # write name
-        self.set('__config_instance_name__', name, root_pass=MocaConfig.__ROOT_PASS)
-        # write version
-        self.set('__MocaConfig_version__', VERSION, root_pass=MocaConfig.__ROOT_PASS)
+        # self.set('__moca_config_access_token__', access_token, root_pass=MocaConfig.__ROOT_PASS)
+        # # write name
+        # self.set('__config_instance_name__', name, root_pass=MocaConfig.__ROOT_PASS)
+        # # write version
+        # self.set('__MocaConfig_version__', VERSION, root_pass=MocaConfig.__ROOT_PASS)
 
     # ----------------------------------------------------------------------------
     # ----------------------------------------------------------------------------
@@ -354,7 +354,7 @@ class MocaConfig(object):
         """Reload json config file."""
         try:
             time = stat(str(self.__path)).st_mtime
-            if (self.__timestamp is not None) and (time != self.__timestamp):
+            if (self.__timestamp is None) or (time != self.__timestamp):
                 with open(str(self.__path), mode='r', encoding='utf-8') as config_file:
                     new_cache = load(config_file)
                     old_cache = self.__config_cache
