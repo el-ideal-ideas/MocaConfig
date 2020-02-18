@@ -50,7 +50,7 @@ from os import stat
 
 # -- Variables --------------------------------------------------------------------------
 
-VERSION = '1.5.2'
+VERSION = '1.5.3'
 
 # -------------------------------------------------------------------------- Variables --
 
@@ -651,7 +651,7 @@ class MocaConfig(object):
                      config_file,
                      ensure_ascii=False,
                      indent=4,
-                     sort_keys=False,
+                     sort_keys=True,
                      separators=(',', ': '))
             return True
         except (FileNotFoundError, PermissionError, OSError, Exception):
