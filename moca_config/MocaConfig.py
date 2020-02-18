@@ -33,7 +33,7 @@ https://www.el-ideal-ideas.com
 # -- Imports --------------------------------------------------------------------------
 
 from typing import Any, Union, List, Tuple, Optional, Dict, Callable
-from moca_core import N, MocaFileError, run_on_other_thread, MOCHI_MOCHI, encrypt, decrypt
+from moca_core import N, MocaFileError, run_on_other_thread, MOCHI_MOCHI, encrypt, decrypt, get_children_file_list
 from pathlib import Path
 from json import load, dump, JSONDecodeError, dumps, loads
 from time import sleep
@@ -50,7 +50,7 @@ from os import stat
 
 # -- Variables --------------------------------------------------------------------------
 
-VERSION = '1.5.3'
+VERSION = '1.5.5'
 
 # -------------------------------------------------------------------------- Variables --
 
@@ -111,6 +111,9 @@ class MocaConfig(object):
 
     __timestamp: Optional[int]
         the timestamp of the config file.
+        
+    __name: str
+        the name of this instance.
     """
 
     __INIT_MSG = {
@@ -168,6 +171,8 @@ class MocaConfig(object):
             TypeError: if the arguments type is incorrect.
             MocaFileError: if can't find, open or create config file.
         """
+        # set name
+        self.__name: str = name
         # initialize timestamp variable
         self.__timestamp: Optional[float] = None
         # initialize handlers dictionary
@@ -211,14 +216,14 @@ class MocaConfig(object):
         self.reload_config()
         # start reload-config-loop on other thread
         run_on_other_thread(self.__reload_config_loop)
+        # write access token
+        self.set('__moca_config_access_token__', access_token, root_pass=MocaConfig.__ROOT_PASS)
+        # write name
+        self.set('__config_instance_name__', name, root_pass=MocaConfig.__ROOT_PASS)
+        # write version
+        self.set('__MocaConfig_version__', VERSION, root_pass=MocaConfig.__ROOT_PASS)
         # add self to instance list
         MocaConfig.__instance_list[name] = self
-        # write access token
-        # self.set('__moca_config_access_token__', access_token, root_pass=MocaConfig.__ROOT_PASS)
-        # # write name
-        # self.set('__config_instance_name__', name, root_pass=MocaConfig.__ROOT_PASS)
-        # # write version
-        # self.set('__MocaConfig_version__', VERSION, root_pass=MocaConfig.__ROOT_PASS)
 
     # ----------------------------------------------------------------------------
     # ----------------------------------------------------------------------------
@@ -227,6 +232,14 @@ class MocaConfig(object):
     def status(self) -> int:
         """Return the self.__status"""
         return self.__status
+
+    # ----------------------------------------------------------------------------
+    # ----------------------------------------------------------------------------
+
+    @property
+    def name(self) -> str:
+        """Return the self.__name"""
+        return self.__name
 
     # ----------------------------------------------------------------------------
     # ----------------------------------------------------------------------------
@@ -1076,5 +1089,50 @@ class MocaConfig(object):
                     print_exc()
         except KeyError:
             pass
+
+    # ----------------------------------------------------------------------------
+    # ----------------------------------------------------------------------------
+
+    def change_name(self,
+                    name: str) -> None:
+        """Change the name of the instance."""
+        try:
+            del MocaConfig.__instance_list[self.__name]
+        except KeyError:
+            pass
+        self.__name = name
+        MocaConfig.__instance_list[name] = self
+
+    # ----------------------------------------------------------------------------
+    # ----------------------------------------------------------------------------
+
+    @classmethod
+    def load_config_files(cls,
+                          config_dir: Union[Path, str]) -> int:
+        """
+        Load all config files in the config directory.
+        :param config_dir: the path to the config directory.
+        :return: the number of loaded config files.
+        """
+        count = 0
+        config_file_list = get_children_file_list(config_dir)
+        for config_file in config_file_list:
+            try:
+                with open(str(config_file), mode='r', encoding='utf-8') as config:
+                    try:
+                        value = load(config)
+                        if isinstance(value, dict):
+                            try:
+                                cls(value.get('__config_instance_name__', uuid4().hex), config_file)
+                                count += 1
+                            except (TypeError, MocaFileError):
+                                pass
+                        else:
+                            pass
+                    except JSONDecodeError:
+                        pass
+            except (FileNotFoundError, PermissionError, OSError, Exception):
+                pass
+        return count
 
 # -------------------------------------------------------------------------- Main Class --
