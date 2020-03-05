@@ -50,7 +50,7 @@ from os import stat
 
 # -- Variables --------------------------------------------------------------------------
 
-VERSION = '2.0.0'
+VERSION = '2.0.1'
 
 # -------------------------------------------------------------------------- Variables --
 
@@ -659,15 +659,20 @@ class MocaConfig(object):
         :return: status, [success] or [failed]
         """
         try:
-            with open(str(self.path), mode='w', encoding='utf-8') as config_file:
-                json_string = dumps(self.__config_cache,
-                                    ensure_ascii=False,
-                                    indent=4,
-                                    sort_keys=True,
-                                    separators=(',', ': '))
-                config_file.write(json_string)
-            return True
-        except (FileNotFoundError, PermissionError, OSError, Exception):
+            json_string = dumps(self.__config_cache,
+                                ensure_ascii=False,
+                                indent=4,
+                                sort_keys=True,
+                                separators=(',', ': '))
+            try:
+                with open(str(self.path), mode='w', encoding='utf-8') as config_file:
+                    config_file.write(json_string)
+                return True
+            except (FileNotFoundError, PermissionError, OSError, Exception):
+                return False
+        except Exception:
+            from traceback import print_exc
+            print_exc()
             return False
 
     # ----------------------------------------------------------------------------
