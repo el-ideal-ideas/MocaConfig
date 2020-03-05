@@ -50,7 +50,7 @@ from os import stat
 
 # -- Variables --------------------------------------------------------------------------
 
-VERSION = '1.5.5'
+VERSION = '2.0.0'
 
 # -------------------------------------------------------------------------- Variables --
 
@@ -660,12 +660,12 @@ class MocaConfig(object):
         """
         try:
             with open(str(self.path), mode='w', encoding='utf-8') as config_file:
-                dump(self.__config_cache,
-                     config_file,
-                     ensure_ascii=False,
-                     indent=4,
-                     sort_keys=True,
-                     separators=(',', ': '))
+                json_string = dumps(self.__config_cache,
+                                    ensure_ascii=False,
+                                    indent=4,
+                                    sort_keys=True,
+                                    separators=(',', ': '))
+                config_file.write(json_string)
             return True
         except (FileNotFoundError, PermissionError, OSError, Exception):
             return False
@@ -1064,6 +1064,8 @@ class MocaConfig(object):
                                                     new_cache[key],
                                                     *self.__handler[name][2],
                                                     **self.__handler[name][3])
+                        except SystemExit:
+                            raise
                         except Exception:
                             print_exc()
             except KeyError:
@@ -1085,6 +1087,8 @@ class MocaConfig(object):
                                             new_value,
                                             *self.__handler[name][2],
                                             **self.__handler[name][3])
+                except SystemExit:
+                    raise
                 except Exception:
                     print_exc()
         except KeyError:
