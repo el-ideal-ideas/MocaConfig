@@ -50,7 +50,7 @@ from os import stat
 
 # -- Variables --------------------------------------------------------------------------
 
-VERSION = '2.0.1'
+VERSION = '2.0.2'
 
 # -------------------------------------------------------------------------- Variables --
 
@@ -680,7 +680,7 @@ class MocaConfig(object):
 
     def set(self,
             key: str,
-            value: Any,
+            config_value: Any,
             allow_el_command: bool = False,
             access_token: str = '',
             root_pass: str = '') -> Optional[bool]:
@@ -688,7 +688,7 @@ class MocaConfig(object):
         set a config value.
         if the key already exists, overwrite it.
         :param key: the config name.
-        :param value: the config value.
+        :param config_value: the config value.
         :param allow_el_command: use el command.
         :param access_token: the access token of config file.
         :param root_pass: the root password.
@@ -711,6 +711,11 @@ class MocaConfig(object):
             else:
                 allow = True
         if allow:
+            try:
+                _ = dumps(config_value)
+                value = config_value
+            except TypeError:
+                value = str(config_value)
             if allow_el_command:
                 status, response = self.el_command_parser(value)
                 if status:
