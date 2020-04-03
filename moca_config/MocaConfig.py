@@ -47,7 +47,7 @@ from typing import Optional
 
 # -- Variables --------------------------------------------------------------------------
 
-VERSION = '3.0.0'
+VERSION = '3.0.1'
 
 # -------------------------------------------------------------------------- Variables --
 
@@ -217,9 +217,9 @@ class MocaConfig(object):
         # start reload-config-loop on other thread
         Thread(target=self._reload_config_loop, name='reload_config_loop', daemon=True).start()
         # initialize access token
-        self.get('__moca_config_access_token__', access_token, root_pass=MocaConfig._ROOT_PASS)
+        self.get('__moca_config_access_token__', str, access_token, root_pass=MocaConfig._ROOT_PASS)
         # initialize config name
-        self.get('__config_instance_name__', name, root_pass=MocaConfig._ROOT_PASS)
+        self.get('__config_instance_name__', str, name, root_pass=MocaConfig._ROOT_PASS)
         # write version
         self.set('__MocaConfig_version__', VERSION, root_pass=MocaConfig._ROOT_PASS)
         # add self to instance list
