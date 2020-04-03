@@ -16,17 +16,10 @@
 
 
 """
-Moca Config Module
-モカシステム設定モジュール
-茉客系统设定模块
-
-[MocaConfig]
-
 Copyright (c) 2020.1.17 [el.ideal-ideas]
-
-This software is released under the MIT License. see LICENSE.txt.
-
-https://www.el-ideal-ideas.com
+This software is released under the MIT License.
+see LICENSE.txt or following URL.
+https://www.el-ideal-ideas.com/MocaLog/LICENSE/
 """
 
 

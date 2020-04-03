@@ -8,7 +8,7 @@ package_name = "moca_config"
 root_dir = path.abspath(path.dirname(__file__))
 
 
-def __requirements():
+def _requirements():
     require_list = [name.rstrip() for name in open(path.join(root_dir, 'requirements.txt')).readlines()]
     print('----------------------------------------------------------------------------')
     print('Requirements List: ' + ','.join(require_list))
@@ -19,12 +19,13 @@ def __requirements():
 with open('README.md', mode='r', encoding='utf-8') as f:
     long_description = f.read()
 
+
 setup(
     name=package_name,
     packages=find_packages(),
     version=VERSION,
     license=license,
-    install_requires=__requirements(),
+    install_requires=_requirements(),
     author='el.ideal-ideas',
     author_email='el.idealideas@gmail.com',
     url='https://github.com/el-ideal-ideas/MocaConfig',
@@ -38,8 +39,5 @@ setup(
         'Programming Language :: Python',
         'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
-        'Natural Language :: English',
-        'Natural Language :: Japanese',
-        'Natural Language :: Chinese (Simplified)',
     ],
 )

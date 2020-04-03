@@ -16,24 +16,16 @@
 
 
 """
-Moca Config Module
-モカシステム設定モジュール
-茉客系统设定模块
-
-[MocaConfig]
-
 Copyright (c) 2020.1.17 [el.ideal-ideas]
-
-This software is released under the MIT License. see LICENSE.txt.
-
-https://www.el-ideal-ideas.com
+This software is released under the MIT License.
+see LICENSE.txt or following URL.
+https://www.el-ideal-ideas.com/MocaLog/LICENSE/
 """
 
 
 # -- Imports --------------------------------------------------------------------------
 
-from typing import Any, Union, List, Tuple, Optional, Dict, Callable
-from moca_core import N, MocaFileError, run_on_other_thread, MOCHI_MOCHI, encrypt, decrypt, get_children_file_list
+from typing import *
 from pathlib import Path
 from json import load, dump, JSONDecodeError, dumps, loads
 from time import sleep
@@ -45,16 +37,21 @@ from multiprocessing import current_process, cpu_count
 from base64 import b64encode, b64decode
 from traceback import print_exc
 from os import stat
+from threading import Thread
+from Crypto.Cipher import AES
+from Crypto.Hash import SHA256
+from Crypto import Random
+from typing import Optional
 
 # -------------------------------------------------------------------------- Imports --
 
 # -- Variables --------------------------------------------------------------------------
 
-VERSION = '2.0.2'
+VERSION = '3.0.0'
 
 # -------------------------------------------------------------------------- Variables --
 
-# -- Main Class --------------------------------------------------------------------------
+# -- MocaConfig --------------------------------------------------------------------------
 
 
 class MocaConfig(object):
@@ -91,40 +88,40 @@ class MocaConfig(object):
 
     Attributes
     ----------
-    __path: Path
+    _path: Path
         the config file path
 
-    __reload_interval: float
+    _reload_interval: float
         the reload interval
 
-    __config_cache: dict
+    _config_cache: dict
         config cache
 
-    __status: int
+    _status: int
         the status of config module, 0 is correct
 
-    __handler: Dict[str, List]
+    _handlers: Dict[str, List]
         the handlers
 
-    __handled_keys: Dict[str, List[str]]
+    _handled_keys: Dict[str, List[str]]
         the keys handled by handlers.
 
-    __timestamp: Optional[int]
+    _timestamp: Optional[int]
         the timestamp of the config file.
         
-    __name: str
+    _name: str
         the name of this instance.
     """
 
-    __INIT_MSG = {
+    _INIT_MSG = {
         "__MocaConfig__": "Welcome to MocaConfig, the config module is now available.",
         "__MocaConfig_version__": VERSION,
         "__private__": False,
     }
 
-    __ROOT_PASS = ''
+    _ROOT_PASS = ''
 
-    __instance_list: dict = {}
+    _instance_list: dict = {}
 
     # status code
     CORRECT = 0
@@ -157,6 +154,7 @@ class MocaConfig(object):
                  filename: str = '',
                  reload_interval: float = 1.0,
                  access_token: str = '',
+                 debug_mode: bool = False,
                  **kwargs):
         """
         The initializer of MocaConfig class.
@@ -165,23 +163,25 @@ class MocaConfig(object):
         :param filename: the name of json config file.
         :param reload_interval: the interval to reload config file. if the value is -1, never reload config file
         :param access_token: the access token of config file.
+        :param debug_mode: turn on debug mode.
 
         Raise
         -----
             TypeError: if the arguments type is incorrect.
-            MocaFileError: if can't find, open or create config file.
         """
         # set name
-        self.__name: str = name
+        self._name: str = name
+        # set debug mode
+        self._debug_mode = debug_mode
         # initialize timestamp variable
-        self.__timestamp: Optional[float] = None
+        self._timestamp: Optional[float] = None
         # initialize handlers dictionary
-        self.__handler: Dict[str, List] = {}
+        self._handlers: Dict[str, List] = {}
         # initialize handled keys list
-        self.__handled_keys: Dict[str, List[str]] = {}
+        self._handled_keys: Dict[str, List[str]] = {}
         #############################
         if kwargs.get('mochi', False):
-            MocaConfig.__INIT_MSG['__mochi__'] = 'もっちもっちにゃんにゃん'
+            MocaConfig._INIT_MSG['__mochi__'] = 'もっちもっちにゃんにゃん'
         #############################
         # set config file path
         path: Path
@@ -200,30 +200,30 @@ class MocaConfig(object):
             raise TypeError('Argument type error, '
                             'Expected filename: str, '
                             f'But received filename: {type(filename)}')
-        self.__path: Path = self.change_config_file_path(path)  # this method can raise MocaFileError.
+        self._path: Path = self.change_config_file_path(path)
         # set reload interval
         if isinstance(reload_interval, float) or isinstance(reload_interval, int):
-            self.__reload_interval: float = float(reload_interval)
+            self._reload_interval: float = float(reload_interval)
         else:
             TypeError('Argument type error, '
                       'Expected reload_interval: float, '
                       f'But received reload_interval: {type(reload_interval)}')
         # initialize cache variable
-        self.__config_cache: dict = {}
+        self._config_cache: dict = {}
         # set current status
-        self.__status: int = MocaConfig.CORRECT
+        self._status: int = MocaConfig.CORRECT
         # load config file
         self.reload_config()
         # start reload-config-loop on other thread
-        run_on_other_thread(self.__reload_config_loop)
-        # write access token
-        self.set('__moca_config_access_token__', access_token, root_pass=MocaConfig.__ROOT_PASS)
-        # write name
-        self.set('__config_instance_name__', name, root_pass=MocaConfig.__ROOT_PASS)
+        Thread(target=self._reload_config_loop, name='reload_config_loop', daemon=True).start()
+        # initialize access token
+        self.get('__moca_config_access_token__', access_token, root_pass=MocaConfig._ROOT_PASS)
+        # initialize config name
+        self.get('__config_instance_name__', name, root_pass=MocaConfig._ROOT_PASS)
         # write version
-        self.set('__MocaConfig_version__', VERSION, root_pass=MocaConfig.__ROOT_PASS)
+        self.set('__MocaConfig_version__', VERSION, root_pass=MocaConfig._ROOT_PASS)
         # add self to instance list
-        MocaConfig.__instance_list[name] = self
+        MocaConfig._instance_list[name] = self
 
     # ----------------------------------------------------------------------------
     # ----------------------------------------------------------------------------
@@ -231,7 +231,7 @@ class MocaConfig(object):
     @property
     def status(self) -> int:
         """Return the self.__status"""
-        return self.__status
+        return self._status
 
     # ----------------------------------------------------------------------------
     # ----------------------------------------------------------------------------
@@ -239,7 +239,7 @@ class MocaConfig(object):
     @property
     def name(self) -> str:
         """Return the self.__name"""
-        return self.__name
+        return self._name
 
     # ----------------------------------------------------------------------------
     # ----------------------------------------------------------------------------
@@ -252,8 +252,8 @@ class MocaConfig(object):
         :param password: the root password.
         :return: status, [success] or [failed]
         """
-        if cls.__ROOT_PASS == '':
-            cls.__ROOT_PASS = password
+        if cls._ROOT_PASS == '':
+            cls._ROOT_PASS = password
             return True
         else:
             return False
@@ -271,8 +271,8 @@ class MocaConfig(object):
         :param old_password: the old root password.
         :return: status, [success] or [failed]
         """
-        if cls.__ROOT_PASS == old_password:
-            cls.__ROOT_PASS = new_password
+        if cls._ROOT_PASS == old_password:
+            cls._ROOT_PASS = new_password
             return True
         else:
             return False
@@ -283,7 +283,7 @@ class MocaConfig(object):
     @property
     def path(self) -> Path:
         """Return the self.__path"""
-        return self.__path
+        return self._path
 
     # ----------------------------------------------------------------------------
     # ----------------------------------------------------------------------------
@@ -291,7 +291,7 @@ class MocaConfig(object):
     @property
     def reload_interval(self) -> float:
         """Return the self.__reload_interval"""
-        return self.__reload_interval
+        return self._reload_interval
 
     # ----------------------------------------------------------------------------
     # ----------------------------------------------------------------------------
@@ -299,7 +299,7 @@ class MocaConfig(object):
     @classmethod
     def get_instance_list(cls) -> List[str]:
         """Return a list of instance names"""
-        return list(cls.__instance_list.keys())
+        return list(cls._instance_list.keys())
 
     # ----------------------------------------------------------------------------
     # ----------------------------------------------------------------------------
@@ -307,14 +307,14 @@ class MocaConfig(object):
     def change_reload_interval(self,
                                interval: float) -> None:
         """Change the reload interval"""
-        self.__reload_interval = interval
+        self._reload_interval = interval
 
     # ----------------------------------------------------------------------------
     # ----------------------------------------------------------------------------
 
     def stop_auto_reload(self) -> None:
         """Stop auto reload"""
-        self.__reload_interval = -1
+        self._reload_interval = -1
 
     # ----------------------------------------------------------------------------
     # ----------------------------------------------------------------------------
@@ -325,39 +325,23 @@ class MocaConfig(object):
         Change the path of config file.
         :param path: the path of the config file.
         :return: the path of the config file.
-        Arise
-        -----
-            MocaFileError: If can't change the path of config file.
         """
         config_file_path: Path
         if isinstance(path, str):
             config_file_path = Path(path)
         else:
             config_file_path = path
-        if not config_file_path.is_file():  # if file is not exist, create it
-            if not config_file_path.parent.is_dir():
-                config_file_path.parent.mkdir(parents=True, exist_ok=True)
-            try:
-                with open(str(config_file_path), mode='w', encoding='utf-8') as config_file:
-                    dump(MocaConfig.__INIT_MSG,
-                         config_file,
-                         ensure_ascii=False,
-                         indent=4,
-                         sort_keys=False,
-                         separators=(',', ': '))
-            except (FileNotFoundError, PermissionError, OSError, Exception) as error:
-                raise MocaFileError(f"Can't create config file.{N}"
-                                    f"Details: {N}"
-                                    f"{error}")
-        else:
-            try:
-                with open(str(config_file_path), mode='r', encoding='utf-8') as _:
-                    pass
-            except (FileNotFoundError, PermissionError, OSError, Exception) as error:
-                raise MocaFileError(f"Can't open config file.{N}"
-                                    f"Details: {N}"
-                                    f"{error}")
-        self.__path = config_file_path
+        # try create parent directory.
+        config_file_path.parent.mkdir(parents=True, exist_ok=True)
+        if not config_file_path.is_file():  # if file is not exists, create new file.
+            with open(str(config_file_path), mode='w', encoding='utf-8') as config_file:
+                dump(MocaConfig._INIT_MSG,
+                     config_file,
+                     ensure_ascii=False,
+                     indent=4,
+                     sort_keys=False,
+                     separators=(',', ': '))
+        self._path = config_file_path
         return config_file_path
 
     # ----------------------------------------------------------------------------
@@ -366,27 +350,35 @@ class MocaConfig(object):
     def reload_config(self) -> None:
         """Reload json config file."""
         try:
-            time = stat(str(self.__path)).st_mtime
-            if (self.__timestamp is None) or (time != self.__timestamp):
-                with open(str(self.__path), mode='r', encoding='utf-8') as config_file:
+            time = stat(str(self._path)).st_mtime
+            if (self._timestamp is None) or (time != self._timestamp):
+                with open(str(self._path), mode='r', encoding='utf-8') as config_file:
                     new_cache = load(config_file)
-                    old_cache = self.__config_cache
-                    self.__config_cache = new_cache
-                    self.__run_handler_total(old_cache, new_cache)
-            self.__timestamp = time
-            self.__status = MocaConfig.CORRECT
+                    old_cache = self._config_cache
+                    self._config_cache = new_cache
+                    self._run_handler_total(old_cache, new_cache)
+            self._timestamp = time
+            self._status = MocaConfig.CORRECT
         except JSONDecodeError:
-            self.__status = MocaConfig.DECODE_ERROR
+            if self._debug_mode:
+                print_exc()
+            self._status = MocaConfig.DECODE_ERROR
         except FileNotFoundError:
-            self.__status = MocaConfig.FILE_NOT_FOUND
+            if self._debug_mode:
+                print_exc()
+            self._status = MocaConfig.FILE_NOT_FOUND
         except PermissionError:
-            self.__status = MocaConfig.PERMISSION_ERROR
+            if self._debug_mode:
+                print_exc()
+            self._status = MocaConfig.PERMISSION_ERROR
         except OSError:
-            self.__status = MocaConfig.OS_ERROR
+            if self._debug_mode:
+                print_exc()
+            self._status = MocaConfig.OS_ERROR
         except Exception:
-            from traceback import print_exc
-            print_exc()
-            self.__status = MocaConfig.UNKNOWN_ERROR
+            if self._debug_mode:
+                print_exc()
+            self._status = MocaConfig.UNKNOWN_ERROR
 
     # ----------------------------------------------------------------------------
     # ----------------------------------------------------------------------------
@@ -416,7 +408,7 @@ class MocaConfig(object):
     # ----------------------------------------------------------------------------
     # ----------------------------------------------------------------------------
 
-    def __reload_config_loop(self) -> None:
+    def _reload_config_loop(self) -> None:
         """the reload-config-loop."""
         while True:
             if self.reload_interval == -1:
@@ -433,7 +425,7 @@ class MocaConfig(object):
 
     def get_config_size(self) -> int:
         """Return config cache size"""
-        return len(self.__config_cache)
+        return len(self._config_cache)
 
     # ----------------------------------------------------------------------------
     # ----------------------------------------------------------------------------
@@ -448,17 +440,17 @@ class MocaConfig(object):
         :return: if can't access to the config file, return None
         """
         if self.is_private():
-            if (MocaConfig.__ROOT_PASS == root_pass) or bool(self.check_access_token(access_token,
-                                                                                     MocaConfig.__ROOT_PASS)):
-                return self.__config_cache
+            if (MocaConfig._ROOT_PASS == root_pass) or bool(self.check_access_token(access_token,
+                                                                                    MocaConfig._ROOT_PASS)):
+                return self._config_cache
             else:
                 return None
         else:
-            if (MocaConfig.__ROOT_PASS == root_pass) or bool(self.check_access_token(access_token,
-                                                                                     MocaConfig.__ROOT_PASS)):
-                return self.__config_cache
+            if (MocaConfig._ROOT_PASS == root_pass) or bool(self.check_access_token(access_token,
+                                                                                    MocaConfig._ROOT_PASS)):
+                return self._config_cache
             else:
-                return {key: value for key, value in self.__config_cache.items() if not key.startswith('_')}
+                return {key: value for key, value in self._config_cache.items() if not key.startswith('_')}
 
     # ----------------------------------------------------------------------------
     # ----------------------------------------------------------------------------
@@ -474,17 +466,17 @@ class MocaConfig(object):
         :return: if can't access to the config file, return None
         """
         if self.is_private():
-            if (MocaConfig.__ROOT_PASS == root_pass) or bool(self.check_access_token(access_token,
-                                                                                     MocaConfig.__ROOT_PASS)):
-                return tuple(self.__config_cache.keys())
+            if (MocaConfig._ROOT_PASS == root_pass) or bool(self.check_access_token(access_token,
+                                                                                    MocaConfig._ROOT_PASS)):
+                return tuple(self._config_cache.keys())
             else:
                 return None
         else:
-            if (MocaConfig.__ROOT_PASS == root_pass) or bool(self.check_access_token(access_token,
-                                                                                     MocaConfig.__ROOT_PASS)):
-                return tuple(self.__config_cache.keys())
+            if (MocaConfig._ROOT_PASS == root_pass) or bool(self.check_access_token(access_token,
+                                                                                    MocaConfig._ROOT_PASS)):
+                return tuple(self._config_cache.keys())
             else:
-                return tuple([key for key in self.__config_cache.keys() if not key.startswith('_')])
+                return tuple([key for key in self._config_cache.keys() if not key.startswith('_')])
 
     # ----------------------------------------------------------------------------
     # ----------------------------------------------------------------------------
@@ -536,11 +528,37 @@ class MocaConfig(object):
             elif command == cls.CPU_COUNT:
                 return True, cpu_count()
             elif command == cls.MOCHI:
-                return True, MOCHI_MOCHI
+                return True, 'もっちもっちにゃんにゃん'
             else:
                 return False, None
         else:
             return False, None
+
+    # ----------------------------------------------------------------------------
+    # ----------------------------------------------------------------------------
+
+    def _is_allowed(self,
+                    key: str,
+                    root_pass: str,
+                    access_token: str) -> bool:
+        """Check is access allowed."""
+        allow: bool
+        if self.is_private():
+            if (MocaConfig._ROOT_PASS == root_pass) or bool(self.check_access_token(access_token,
+                                                                                    MocaConfig._ROOT_PASS)):
+                allow = True
+            else:
+                allow = False
+        else:
+            if key.startswith('_'):
+                if (MocaConfig._ROOT_PASS == root_pass) or bool(self.check_access_token(access_token,
+                                                                                        MocaConfig._ROOT_PASS)):
+                    allow = True
+                else:
+                    allow = False
+            else:
+                allow = True
+        return allow
 
     # ----------------------------------------------------------------------------
     # ----------------------------------------------------------------------------
@@ -568,34 +586,18 @@ class MocaConfig(object):
                  if the response type is incorrect and can't convert the value, return default value.
                  if can't access to the config file, return default value.
         """
-        allow: bool
-        if self.is_private():
-            if (MocaConfig.__ROOT_PASS == root_pass) or bool(self.check_access_token(access_token,
-                                                                                     MocaConfig.__ROOT_PASS)):
-                allow = True
-            else:
-                allow = False
-        else:
-            if key.startswith('_'):
-                if (MocaConfig.__ROOT_PASS == root_pass) or bool(self.check_access_token(access_token,
-                                                                                         MocaConfig.__ROOT_PASS)):
-                    allow = True
-                else:
-                    allow = False
-            else:
-                allow = True
-        if allow:
-            if key == MocaConfig.GET_ALL_CONFIG:
-                return self.__config_cache
+        if self._is_allowed(key, root_pass, access_token):
             try:
                 if allow_el_command:
+                    if key == MocaConfig.GET_ALL_CONFIG:
+                        return self._config_cache
                     status, response = self.el_command_parser(key)
                     if status:
                         value = response
                     else:
-                        value = self.__config_cache[key]
+                        value = self._config_cache[key]
                 else:
-                    value = self.__config_cache[key]
+                    value = self._config_cache[key]
             except (KeyError, Exception):
                 if save_unknown_config:
                     self.set(key, default)
@@ -653,26 +655,39 @@ class MocaConfig(object):
     # ----------------------------------------------------------------------------
     # ----------------------------------------------------------------------------
 
-    def __save_config_to_file(self) -> bool:
+    def _save_config_to_file(self) -> bool:
         """
         Save the config data to config file
         :return: status, [success] or [failed]
         """
         try:
-            json_string = dumps(self.__config_cache,
+            json_string = dumps(self._config_cache,
                                 ensure_ascii=False,
                                 indent=4,
                                 sort_keys=True,
                                 separators=(',', ': '))
-            try:
-                with open(str(self.path), mode='w', encoding='utf-8') as config_file:
-                    config_file.write(json_string)
-                return True
-            except (FileNotFoundError, PermissionError, OSError, Exception):
-                return False
+            with open(str(self.path), mode='w', encoding='utf-8') as config_file:
+                config_file.write(json_string)
+            return True
+        except FileNotFoundError:
+            if self._debug_mode:
+                print_exc()
+            self.__status = MocaConfig.FILE_NOT_FOUND
+            return False
+        except PermissionError:
+            if self._debug_mode:
+                print_exc()
+            self.__status = MocaConfig.PERMISSION_ERROR
+            return False
+        except OSError:
+            if self._debug_mode:
+                print_exc()
+            self.__status = MocaConfig.OS_ERROR
+            return False
         except Exception:
-            from traceback import print_exc
-            print_exc()
+            if self._debug_mode:
+                print_exc()
+            self.__status = MocaConfig.UNKNOWN_ERROR
             return False
 
     # ----------------------------------------------------------------------------
@@ -694,23 +709,7 @@ class MocaConfig(object):
         :param root_pass: the root password.
         :return: status, [success] or [failed], If can't access to the config file return None
         """
-        allow: bool
-        if self.is_private():
-            if (MocaConfig.__ROOT_PASS == root_pass) or bool(self.check_access_token(access_token,
-                                                                                     MocaConfig.__ROOT_PASS)):
-                allow = True
-            else:
-                allow = False
-        else:
-            if key.startswith('_'):
-                if (MocaConfig.__ROOT_PASS == root_pass) or bool(self.check_access_token(access_token,
-                                                                                         MocaConfig.__ROOT_PASS)):
-                    allow = True
-                else:
-                    allow = False
-            else:
-                allow = True
-        if allow:
+        if self._is_allowed(key, root_pass, access_token):
             try:
                 _ = dumps(config_value)
                 value = config_value
@@ -725,18 +724,18 @@ class MocaConfig(object):
             else:
                 new_value = value
             try:
-                old_value = self.__config_cache[key]
+                old_value = self._config_cache[key]
             except KeyError:
                 old_value = None
-            self.__config_cache[key] = new_value
-            res = self.__save_config_to_file()
+            self._config_cache[key] = new_value
+            res = self._save_config_to_file()
             if res:
                 if old_value is not None:
-                    self.__run_handler_one(key, old_value, new_value)
+                    self._run_handler_one(key, old_value, new_value)
                 return True
             else:
                 try:
-                    del self.__config_cache[key]
+                    del self._config_cache[key]
                 except KeyError:
                     pass
                 return False
@@ -757,16 +756,15 @@ class MocaConfig(object):
         :param root_pass: the root password.
         :return: status, [success] or [failed]. If can't access to this config file. return None.
         """
-        if (MocaConfig.__ROOT_PASS == root_pass) or bool(self.check_access_token(access_token,
-                                                                                 MocaConfig.__ROOT_PASS)):
+        if self._is_allowed(key, root_pass, access_token):
             try:
-                value = self.__config_cache[key]
-                del self.__config_cache[key]
-                res = self.__save_config_to_file()
+                value = self._config_cache[key]
+                del self._config_cache[key]
+                res = self._save_config_to_file()
                 if res:
                     return True
                 else:
-                    self.__config_cache[key] = value
+                    self._config_cache[key] = value
                     return False
             except KeyError:
                 return False
@@ -781,7 +779,7 @@ class MocaConfig(object):
               res_type: Any,
               value: Any,
               access_token: str = '',
-              root_pass: str = '') -> Optional[bool]:
+              root_pass: str = '') -> bool:
         """
         check is value correct.
         :param key: the config name.
@@ -789,24 +787,10 @@ class MocaConfig(object):
         :param value: input value to check.
         :param access_token: the access token of config file.
         :param root_pass: the root password.
-        :return: status, [correct] or [incorrect]. If can't access to this config file. return None.
+        :return: status, [correct] or [incorrect].
         """
-        status = self.get(key, res_type, allow_el_command=False) == value
-        if self.is_private():
-            if (MocaConfig.__ROOT_PASS == root_pass) or bool(self.check_access_token(access_token,
-                                                                                     MocaConfig.__ROOT_PASS)):
-                return status
-            else:
-                return None
-        else:
-            if key.startswith('_'):
-                if (MocaConfig.__ROOT_PASS == root_pass) or bool(self.check_access_token(access_token,
-                                                                                         MocaConfig.__ROOT_PASS)):
-                    return status
-                else:
-                    return None
-            else:
-                return status
+        return self.get(key, res_type, allow_el_command=False,
+                        access_token=access_token, root_pass=root_pass, default='[el]#moca_null#') == value
 
     # ----------------------------------------------------------------------------
     # ----------------------------------------------------------------------------
@@ -816,7 +800,7 @@ class MocaConfig(object):
                      name: str) -> Any:
         """Return already created instance."""
         try:
-            return cls.__instance_list[name]
+            return cls._instance_list[name]
         except (KeyError, Exception):
             return None
 
@@ -828,7 +812,7 @@ class MocaConfig(object):
         Set the config private. Can't access without access token.
         :return: status, [success] or [failed]
         """
-        return bool(self.set('__private__', True, root_pass=MocaConfig.__ROOT_PASS))
+        return bool(self.set('__private__', True, root_pass=MocaConfig._ROOT_PASS))
 
     # ----------------------------------------------------------------------------
     # ----------------------------------------------------------------------------
@@ -850,7 +834,7 @@ class MocaConfig(object):
     def is_private(self) -> bool:
         """Check is config private"""
         try:
-            return bool(self.__config_cache['__private__'])
+            return bool(self._config_cache['__private__'])
         except (TypeError, ValueError, Exception):
             return True
 
@@ -884,8 +868,8 @@ class MocaConfig(object):
         If some other error occurred return None.
         """
         try:
-            if MocaConfig.__ROOT_PASS == root_pass:
-                return self.__config_cache['__moca_config_access_token__'] == token
+            if MocaConfig._ROOT_PASS == root_pass:
+                return self._config_cache['__moca_config_access_token__'] == token
             else:
                 return None
         except IndexError:
@@ -903,12 +887,14 @@ class MocaConfig(object):
         :param root_pass: the root password.
         :return: status, [success] or [failed]
         """
-        if (MocaConfig.__ROOT_PASS == root_pass) or bool(self.check_access_token(access_token,
-                                                                                 MocaConfig.__ROOT_PASS)):
+        if (MocaConfig._ROOT_PASS == root_pass) or bool(self.check_access_token(access_token,
+                                                                                MocaConfig._ROOT_PASS)):
             try:
-                self.__path.unlink()
+                self._path.unlink()
                 return True
             except (FileNotFoundError, PermissionError, OSError, Exception):
+                if self._debug_mode:
+                    print_exc()
                 return False
         else:
             return False
@@ -919,7 +905,7 @@ class MocaConfig(object):
     @staticmethod
     def mochi() -> str:
         """٩(ˊᗜˋ*)و"""
-        return MOCHI_MOCHI
+        return 'もっちもっちにゃんにゃん'
 
     # ----------------------------------------------------------------------------
     # ----------------------------------------------------------------------------
@@ -928,6 +914,86 @@ class MocaConfig(object):
     def print_mochi() -> None:
         """♫ヽ(゜∇゜ヽ)♪"""
         print(MocaConfig.mochi())
+
+    # ----------------------------------------------------------------------------
+    # ----------------------------------------------------------------------------
+
+    @staticmethod
+    def _create_aes(password: str,
+                    iv: bytes):
+        """
+        create aes object
+        :param password: password
+        :param iv: initialization vector
+        :return: aes object
+        """
+        sha256_hash = SHA256.new()
+        sha256_hash.update(password.encode())
+        hashed_key = sha256_hash.digest()
+        return AES.new(hashed_key, AES.MODE_CFB, iv)
+
+    # ----------------------------------------------------------------------------
+    # ----------------------------------------------------------------------------
+
+    @staticmethod
+    def encrypt(data: bytes,
+                password: str) -> bytes:
+        """
+        encrypt data
+        :param data: plain data
+        :param password: password
+        :return: encrypted data
+        """
+        iv = Random.new().read(AES.block_size)
+        return iv + MocaConfig._create_aes(password, iv).encrypt(data)
+
+    # ----------------------------------------------------------------------------
+    # ----------------------------------------------------------------------------
+
+    @staticmethod
+    def decrypt(data: bytes,
+                password: str) -> bytes:
+        """
+        decrypt data
+        :param data: encrypted data
+        :param password: password
+        :return: plain data
+        """
+        iv, cipher = data[:AES.block_size], data[AES.block_size:]
+        return MocaConfig._create_aes(password, iv).decrypt(cipher)
+
+    # ----------------------------------------------------------------------------
+    # ----------------------------------------------------------------------------
+
+    @staticmethod
+    def encrypt_string(text: str,
+                       password: str) -> Optional[str]:
+        """
+        encrypt string data.
+        :param text: target string.
+        :param password: password.
+        :return: encrypted string. if password is incorrect, return None
+        """
+        try:
+            encrypted_bytes = MocaConfig.encrypt(text.encode(), password)
+            return b64encode(encrypted_bytes).decode()
+        except UnicodeDecodeError:
+            return None
+
+    # ----------------------------------------------------------------------------
+    # ----------------------------------------------------------------------------
+
+    @staticmethod
+    def decrypt_string(text: str,
+                       password: str) -> Optional[str]:
+        """
+        decrypt string data.
+        :param text: encrypted string.
+        :param password: password.
+        :return: plain string. if password is incorrect, return None
+        """
+        plain_bytes = MocaConfig.decrypt(b64decode(text), password)
+        return plain_bytes.decode()
 
     # ----------------------------------------------------------------------------
     # ----------------------------------------------------------------------------
@@ -949,7 +1015,7 @@ class MocaConfig(object):
         :return: status, [success] or [failed], If can't access to the config file return None
         """
         json_string = dumps(value)
-        encrypted_value = encrypt(json_string.encode('utf-8'), password=encrypt_pass)
+        encrypted_value = MocaConfig.encrypt(json_string.encode('utf-8'), password=encrypt_pass)
         encrypted_string = b64encode(encrypted_value).decode('utf-8')
         return self.set(key, encrypted_string, access_token=access_token, root_pass=root_pass)
 
@@ -993,7 +1059,7 @@ class MocaConfig(object):
             return default
         else:
             encrypted_value = b64decode(encrypted_string.encode('utf-8'))
-            plain_value = decrypt(encrypted_value, encrypt_pass).decode()
+            plain_value = MocaConfig.decrypt(encrypted_value, encrypt_pass).decode()
             try:
                 return loads(plain_value)
             except JSONDecodeError:
@@ -1017,18 +1083,18 @@ class MocaConfig(object):
         :param kwargs: keyword arguments to the handler.
         :return: None
         """
-        self.__handler[name] = [keys, handler, args, kwargs]
+        self._handlers[name] = [keys, handler, args, kwargs]
         if isinstance(keys, str):
             try:
-                self.__handled_keys[keys].append(name)
+                self._handled_keys[keys].append(name)
             except KeyError:
-                self.__handled_keys[keys] = [name, ]
+                self._handled_keys[keys] = [name, ]
         else:
             for key in keys:
                 try:
-                    self.__handled_keys[key].append(name)
+                    self._handled_keys[key].append(name)
                 except KeyError:
-                    self.__handled_keys[key] = [name, ]
+                    self._handled_keys[key] = [name]
 
     # ----------------------------------------------------------------------------
     # ----------------------------------------------------------------------------
@@ -1037,10 +1103,10 @@ class MocaConfig(object):
                        name: str) -> None:
         """Remove the registered handler"""
         try:
-            del self.__handler[name]
-            for key in self.__handled_keys:
+            del self._handlers[name]
+            for key in self._handled_keys:
                 try:
-                    self.__handled_keys[key].remove(name)
+                    self._handled_keys[key].remove(name)
                 except ValueError:
                     pass
         except KeyError:
@@ -1053,54 +1119,56 @@ class MocaConfig(object):
                     name: str) -> Optional[Callable]:
         """Get the registered handler"""
         try:
-            return self.__handler[name][1]
+            return self._handlers[name][1]
         except KeyError:
             return None
 
     # ----------------------------------------------------------------------------
     # ----------------------------------------------------------------------------
 
-    def __run_handler_total(self,
-                            old_cache: dict,
-                            new_cache: dict) -> None:
+    def _run_handler_total(self,
+                           old_cache: dict,
+                           new_cache: dict) -> None:
         """Run the handlers if needed."""
-        for key in self.__handled_keys:
+        for key in self._handled_keys:
             try:
                 if old_cache[key] != new_cache[key]:
-                    for name in self.__handled_keys[key]:
+                    for name in self._handled_keys[key]:
                         try:
-                            self.__handler[name][1](key,
+                            self._handlers[name][1](key,
                                                     old_cache[key],
                                                     new_cache[key],
-                                                    *self.__handler[name][2],
-                                                    **self.__handler[name][3])
+                                                    *self._handlers[name][2],
+                                                    **self._handlers[name][3])
                         except SystemExit:
                             raise
                         except Exception:
-                            print_exc()
+                            if self._debug_mode:
+                                print_exc()
             except KeyError:
                 pass
 
     # ----------------------------------------------------------------------------
     # ----------------------------------------------------------------------------
 
-    def __run_handler_one(self,
-                          key: str,
-                          old_value: Any,
-                          new_value: Any) -> None:
+    def _run_handler_one(self,
+                         key: str,
+                         old_value: Any,
+                         new_value: Any) -> None:
         """Run the handlers if needed."""
         try:
-            for name in self.__handled_keys[key]:
+            for name in self._handled_keys[key]:
                 try:
-                    self.__handler[name][1](key,
+                    self._handlers[name][1](key,
                                             old_value,
                                             new_value,
-                                            *self.__handler[name][2],
-                                            **self.__handler[name][3])
+                                            *self._handlers[name][2],
+                                            **self._handlers[name][3])
                 except SystemExit:
                     raise
                 except Exception:
-                    print_exc()
+                    if self._debug_mode:
+                        print_exc()
         except KeyError:
             pass
 
@@ -1111,11 +1179,11 @@ class MocaConfig(object):
                     name: str) -> None:
         """Change the name of the instance."""
         try:
-            del MocaConfig.__instance_list[self.__name]
+            del MocaConfig._instance_list[self._name]
         except KeyError:
             pass
-        self.__name = name
-        MocaConfig.__instance_list[name] = self
+        self._name = name
+        MocaConfig._instance_list[name] = self
 
     # ----------------------------------------------------------------------------
     # ----------------------------------------------------------------------------
@@ -1126,21 +1194,27 @@ class MocaConfig(object):
         """
         Load all config files in the config directory.
         :param config_dir: the path to the config directory.
-        :return: the number of loaded config files.
+        :return: the number of loaded config files. If config_dir is not a directory, return -1.
         """
         count = 0
-        config_file_list = get_children_file_list(config_dir)
+        # set target directory
+        target: Path
+        if isinstance(config_dir, str):
+            target = Path(config_dir)
+        else:
+            target = config_dir
+        if target.is_dir():  # check target directory
+            config_file_list = [item for item in list(target.iterdir()) if item.is_file()]
+        else:
+            return -1
         for config_file in config_file_list:
             try:
                 with open(str(config_file), mode='r', encoding='utf-8') as config:
                     try:
                         value = load(config)
                         if isinstance(value, dict):
-                            try:
-                                cls(value.get('__config_instance_name__', uuid4().hex), config_file)
-                                count += 1
-                            except (TypeError, MocaFileError):
-                                pass
+                            cls(value.get('__config_instance_name__', uuid4().hex), config_file)
+                            count += 1
                         else:
                             pass
                     except JSONDecodeError:
@@ -1149,4 +1223,4 @@ class MocaConfig(object):
                 pass
         return count
 
-# -------------------------------------------------------------------------- Main Class --
+# -------------------------------------------------------------------------- MocaConfig --
