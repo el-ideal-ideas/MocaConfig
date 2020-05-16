@@ -47,7 +47,7 @@ from typing import Optional
 
 # -- Variables --------------------------------------------------------------------------
 
-VERSION = '3.0.1'
+VERSION = '3.0.6'
 
 # -------------------------------------------------------------------------- Variables --
 
@@ -111,6 +111,9 @@ class MocaConfig(object):
         
     _name: str
         the name of this instance.
+
+    _debug_mode: bool
+        debug mode
     """
 
     _INIT_MSG = {
@@ -214,6 +217,9 @@ class MocaConfig(object):
         self._status: int = MocaConfig.CORRECT
         # load config file
         self.reload_config()
+        if self._debug_mode:
+            print('-- current configs ---------------------')
+            print(self._config_cache)
         # start reload-config-loop on other thread
         Thread(target=self._reload_config_loop, name='reload_config_loop', daemon=True).start()
         # initialize access token
@@ -230,7 +236,7 @@ class MocaConfig(object):
 
     @property
     def status(self) -> int:
-        """Return the self.__status"""
+        """Return the self._status"""
         return self._status
 
     # ----------------------------------------------------------------------------
@@ -238,7 +244,7 @@ class MocaConfig(object):
 
     @property
     def name(self) -> str:
-        """Return the self.__name"""
+        """Return the self._name"""
         return self._name
 
     # ----------------------------------------------------------------------------
@@ -282,7 +288,7 @@ class MocaConfig(object):
 
     @property
     def path(self) -> Path:
-        """Return the self.__path"""
+        """Return the self._path"""
         return self._path
 
     # ----------------------------------------------------------------------------
@@ -290,7 +296,7 @@ class MocaConfig(object):
 
     @property
     def reload_interval(self) -> float:
-        """Return the self.__reload_interval"""
+        """Return the self._reload_interval"""
         return self._reload_interval
 
     # ----------------------------------------------------------------------------
@@ -341,6 +347,8 @@ class MocaConfig(object):
                      indent=4,
                      sort_keys=False,
                      separators=(',', ': '))
+            if self._debug_mode:
+                print('Created a new config file.')
         self._path = config_file_path
         return config_file_path
 
@@ -357,7 +365,10 @@ class MocaConfig(object):
                     old_cache = self._config_cache
                     self._config_cache = new_cache
                     self._run_handler_total(old_cache, new_cache)
-            self._timestamp = time
+                    self._timestamp = time
+                if self._debug_mode:
+                    print('-- reloaded config file ---------------------')
+                    print(new_cache)
             self._status = MocaConfig.CORRECT
         except JSONDecodeError:
             if self._debug_mode:
@@ -459,7 +470,7 @@ class MocaConfig(object):
                            access_token: str = '',
                            root_pass: str = '') -> Optional[Tuple]:
         """
-        Return all key in self.__config_cache.
+        Return all key in self._config_cache.
         If the access token or root password is correct, the response will contains private configs.
         :param access_token: the access token of config file.
         :param root_pass: the root password.
@@ -600,7 +611,7 @@ class MocaConfig(object):
                     value = self._config_cache[key]
             except (KeyError, Exception):
                 if save_unknown_config:
-                    self.set(key, default)
+                    self.set(key, default, root_pass=root_pass)
                 return default
             if res_type is any:  # check response type
                 return value
@@ -668,26 +679,30 @@ class MocaConfig(object):
                                 separators=(',', ': '))
             with open(str(self.path), mode='w', encoding='utf-8') as config_file:
                 config_file.write(json_string)
+            if self._debug_mode:
+                print('Saved new config.')
+                print('-- new ---------------------')
+                print(json_string)
             return True
         except FileNotFoundError:
             if self._debug_mode:
                 print_exc()
-            self.__status = MocaConfig.FILE_NOT_FOUND
+            self._status = MocaConfig.FILE_NOT_FOUND
             return False
         except PermissionError:
             if self._debug_mode:
                 print_exc()
-            self.__status = MocaConfig.PERMISSION_ERROR
+            self._status = MocaConfig.PERMISSION_ERROR
             return False
         except OSError:
             if self._debug_mode:
                 print_exc()
-            self.__status = MocaConfig.OS_ERROR
+            self._status = MocaConfig.OS_ERROR
             return False
         except Exception:
             if self._debug_mode:
                 print_exc()
-            self.__status = MocaConfig.UNKNOWN_ERROR
+            self._status = MocaConfig.UNKNOWN_ERROR
             return False
 
     # ----------------------------------------------------------------------------
